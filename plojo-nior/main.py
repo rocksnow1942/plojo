@@ -14,12 +14,7 @@ import base64
 import pandas as pd
 import numpy as np
 import copy
-
-
-file_name = 'hplc_data'
-file_path = os.path.dirname(__file__)
-upload_data_folder = '/Users/hui/Documents/PycharmProjects/HPLCviewer/data_upload'
-temp_position = file_path
+from utils import file_name,file_path,upload_data_folder,temp_position
 
 
 global data_index,info_deque_holder,current_time,temp_data_to_save,raw_data,axis_label_dict,user_pwd,copyed_runs
@@ -374,8 +369,6 @@ def paste_analysis():
         raw_data.experiment_to_save.update({i:'sync'})
         info_box.text = info_deque('Pasted to {}.'.format(ri))
     sync_plot(run_index,**vd_plot_options_fetcher())
-
-
 
 def copy_selected_run():
     global copyed_runs
