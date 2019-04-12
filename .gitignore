@@ -2,6 +2,10 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*.db
+*.bak
+*.dat
+*.dir
 
 # C extensions
 *.so

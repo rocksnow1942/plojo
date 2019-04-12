@@ -33,7 +33,7 @@ copyed_runs = []
 
 view_data_plot = figure(plot_width=1200,plot_height=300)
 view_data_plot.annulus(x=[1, 2, 3,4,5], y=[1, 2, 3,4,5], color="hotpink",inner_radius=0.2, outer_radius=0.5)
-updatenote = ColumnDataSource(dict(x=[1],y=[3.7],text=['Update:\n 1. Added box zoom tool.\n 2. Added option to display integration percentage.']))
+updatenote = ColumnDataSource(dict(x=[1],y=[3.7],text=['Update:\n 1.Add Repair tool to repair previous broken data due to integration bug. \n2. Add tools to copy and paste run.\n 3. Integration bugs fixed.']))
 update_ = Text(x='x', y='y', text='text',text_font_size='12pt',text_font='helvetica')
 view_data_plot.add_glyph(updatenote,update_)
 
@@ -154,7 +154,7 @@ def runs_menu_generator(items):
 
 
 # widgets
-tools_menu = [('Copy Analysis','copy'),('Paste Analysis','paste'),None,('Integrate','integrate'),('Annotate','annotate'),None,('Cut Runs','copy_run'),('Paste Runs','paste_run')]
+tools_menu = [('Copy Analysis','copy'),('Paste Analysis','paste'),None,('Integrate','integrate'),('Annotate','annotate'),None,('Cut Runs','copy_run'),('Paste Runs','paste_run'),('Repair Broken Data','check')]
 mode_selection = RadioButtonGroup(labels=['Upload', 'View', 'Analyze'], button_type='success', width=250)
 edit_dropdown = Dropdown(label='Tool Kit', button_type='success',value='integrate',menu = tools_menu,width=150)
 info_box = PreText(text='Welcome!',width=400)
@@ -268,8 +268,12 @@ analysis_temp_keep = {}
 
 
 def copy_analysis():
+    """
+    copy analysis will copy the selected annotation options for primary_axis:
+    i.e. if both integration and annotation are selected, both will be copyed to clipboard.
+    """
     if len(sd_run_list.value)!=1:
-        info_box.text = info_deque('sele 1 to copy')
+        info_box.text = info_deque('Select Only 1 run to copy analysis.')
         raise ValueError ('sele 1')
     run_index = sd_run_list.value[0]
     index= run_index.split('-')[0]
@@ -277,7 +281,7 @@ def copy_analysis():
     target = raw_data.experiment[index][run_index]
     analysis = set([i.split('-')[0] for i in vd_anotation_option.value if i!='none'])
     if len(analysis) == 0:
-        info_box.text = info_deque('select analysis to copy')
+        info_box.text = info_deque('Select primary_axis analysis in plot options.')
         raise ValueError ('sele 1')
     info_box.text = info_deque('Copying...')
     temp={}
@@ -295,12 +299,69 @@ def copy_analysis():
         global analysis_temp_keep
         analysis_temp_keep = copy.deepcopy(temp)
 
+def check_run_analysis(run_index):
+    """
+    validate integration and annotation parameter
+    generate result.
+    """
+    index= run_index.split('-')[0]
+    target = raw_data.experiment[index][run_index]
+    repair=False
+    for k,i in target.items():
+        if k in curve_type_options:
+            time_max = raw_data.experiment_raw[index][run_index][k]['time'][1]
+            for key,item in i.items():
+                if key == 'integrate':
+                    to_keep= [i for i in zip(item['inte_para'],item['label']) if i[0][1]<=time_max]
+                    if len(to_keep) != len(item['inte_para']):
+                        repair = True
+                    item['inte_para']=[i[0] for i in to_keep]
+                    item['label']=[i[1] for i in to_keep]
+                    item.update({'integrate_gap_x':[],'integrate_gap_y':[],'label_cordinate_x':[],'label_cordinate_y':[],'area':[]})
+                    generate_integration_from_para(run_index,k)
+                elif key == 'annotate':
+                    to_keep= [i for i in zip(item['height'],item['x'],item['label']) if i[1]<=time_max]
+                    if len(to_keep) != len(item['x']):
+                        repair = True
+                    item.update({'height':[i[0] for i in to_keep],'x':[i[1] for i in to_keep],'label':[i[2] for i in to_keep],'y':[]})
+                    annotate_generator(run_index,k)
+    return repair
+
+def check_selected_runs():
+    """
+    check the analysis of selected runs.
+    """
+    entry = sd_run_list.value
+    if mode_selection.active != 1:
+        info_box.text = info_deque('Go to View tab to Select Experiments/Runs.')
+        raise ValueError('go to view tab.')
+    if not entry:
+        to_repair = [i[0] for i in sd_run_list.options]
+        info_box.text = info_deque('No runs selected, Repair {} runs in all selected experiments...'.format(len(to_repair)))
+    else:
+        to_repair = entry
+        info_box.text = info_deque('Start repair {} runs...'.format(len(to_repair)))
+    count=0
+    for i in to_repair:
+        _=check_run_analysis(i)
+        raw_data.experiment_to_save.update({i.split('-')[0]:'sync'})
+        if _:
+            count+=1
+            info_box.text = info_deque('Run {} repaired.'.format(i))
+    info_box.text = info_deque('Done! {} runs repaired.'.format(count))
+    if count:
+        info_box.text = info_deque('!!!DON\'T forget to SAVE!!!')
 
 def paste_analysis():
+    """
+    paste analysis to selected runs.
+    will only paste down integration within allowed run time.
+    """
     global analysis_temp_keep
-    update_opt = copy.deepcopy(analysis_temp_keep)
-    # print(analysis_temp_keep)
     run_index = sd_run_list.value
+    if not run_index:
+        info_box.text = info_deque('Select runs to paste to.')
+        raise ValueError('select run to paste.')
     index= [i.split('-')[0] for i in run_index]
     curve = vd_primary_axis_option.value
     for i,ri in zip(index,run_index):
@@ -308,14 +369,13 @@ def paste_analysis():
         if target.get(curve,'none') == 'none':
             info_box.text = info_deque('{} doesn\'t have curve {}'.format(ri,curve))
         else:
-            target[curve].update(update_opt)
-            if 'integrate' in update_opt.keys():
-                generate_integration_from_para(ri,curve)
-            if 'annotate' in update_opt.keys():
-                annotate_generator(ri,curve)
+            target[curve].update(copy.deepcopy(analysis_temp_keep))
+            _=check_run_analysis(ri)
         raw_data.experiment_to_save.update({i:'sync'})
         info_box.text = info_deque('Pasted to {}.'.format(ri))
     sync_plot(run_index,**vd_plot_options_fetcher())
+
+
 
 def copy_selected_run():
     global copyed_runs
@@ -372,6 +432,8 @@ def edit_dropdown_cb(attr,old,new):
             copy_selected_run()
         elif new == 'paste_run':
             paste_selected_run()
+        elif new == 'check':
+            check_selected_runs()
         else:
             pass
     except:
@@ -382,8 +444,22 @@ def edit_dropdown_cb(attr,old,new):
 
 edit_dropdown.on_change('value',edit_dropdown_cb)
 
+def it_para_check(xe,run_index,curve,xs=0):
+    """
+    check if the x value of integration interval is within the time of current run.
+    """
+    index= run_index.split('-')[0]
+    time_ = raw_data.experiment_raw[index][run_index][curve]['time']
+    if xs>=xe or xe>time_[1]:
+        info_box.text = info_deque('Time parameter error, action aborted.')
+        raise ValueError('time para error.')
+
+
 
 def it_add_button_cb():
+    """
+    add integration
+    """
     run_index = sd_run_list.value[0]
     index= run_index.split('-')[0]
     curve = vd_primary_axis_option.value
@@ -397,6 +473,7 @@ def it_add_button_cb():
     except:
         info_box.text = info_deque('enter valid numbers')
         raise ValueError('wrong input')
+    it_para_check(xe,run_index,curve,xs)
     inte_para= (xs,xe,ys,ye)
     target = raw_data.experiment[index][run_index][curve]
     if not target.get('integrate',{}):
@@ -523,6 +600,7 @@ def an_add_button_cb():
         info_box.text = info_deque('enter valid numbers')
         raise ValueError('wrong input')
     target =  raw_data.experiment[index][run_index][curve]
+    it_para_check(x_position,run_index,curve)
     if not target.get('annotate',{}):
         target.update(annotate={'height':[height],'label':[label],'x':[x_position],'y':[y_position]})
     else:
@@ -550,7 +628,10 @@ def an_delete_button_cb():
     curve = vd_primary_axis_option.value
     target = raw_data.experiment[index][run_index].get(curve,{}).get('annotate',{})
     for key in target.keys():
-        del target[key][to_delete]
+        try:
+            del target[key][to_delete]
+        except:
+            pass
     an_list.options = an_list_menu_generator(run_index,curve)
     an_list.value = []
     raw_data.experiment_to_save.update({index:'sync'})
@@ -585,7 +666,6 @@ def it_integration_list_cb(attr,old,new):
     else:
         pass
 
-
 def it_delete_button_cb():
     to_delete=it_integration_list.value
     if len(to_delete)!=1:
@@ -597,7 +677,10 @@ def it_delete_button_cb():
     curve = vd_primary_axis_option.value
     target = raw_data.experiment[index][run_index].get(curve,{}).get('integrate',{})
     for key in target.keys():
-        del target[key][to_delete]
+        try:
+            del target[key][to_delete]
+        except:
+            pass
     it_integration_list.options = it_integration_list_menu_generator(run_index,curve)
     it_integration_list.value = []
     raw_data.experiment_to_save.update({index:'sync'})
@@ -856,9 +939,6 @@ def vd_plot_options_fetcher():
         sa_range = (0,100)
         offset = ('A',0)
     return dict(offset=offset,plot_backend=plot_format,primary_axis=pa,secondary_axis=sa,analysis=annotation,analysis_s=annotation_s,secondary_axis_range=sa_range)
-
-print(tuple(map(float,'113'.split('-'))))
-
 
 def sd_run_list_cb(attr,old,new):
     if mode_selection.active != 0 and new:
@@ -1125,7 +1205,6 @@ def load_folder_to_experiment(exp_list):
         raw_data.experiment.update({j:{}})
         raw_data.experiment_raw.update({j:{}})
         run_list = glob.glob(os.path.join(i,'*.[cC][sS][vV]'))
-        print(run_list)
         load_csv_to_experiment(run_list,j)
     sd_experiment_list.options=experiment_menu_generator(raw_data.index.keys())
 
