@@ -344,9 +344,9 @@ def check_selected_runs():
     count=0
     for i in to_repair:
         _=check_run_analysis(i)
-        raw_data.experiment_to_save.update({i.split('-')[0]:'sync'})
         if _:
             count+=1
+            raw_data.experiment_to_save.update({i.split('-')[0]:'sync'})
             info_box.text = info_deque('Run {} repaired.'.format(i))
     info_box.text = info_deque('Done! {} runs repaired.'.format(count))
     if count:
