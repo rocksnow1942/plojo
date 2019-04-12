@@ -13,23 +13,23 @@ from io import BytesIO
 import base64
 import pandas as pd
 import numpy as np
-from shutil import copyfile
 import copy
 
 
 file_name = 'hplc_data'
-file_path = '/Users/hui/Documents/PycharmProjects/HPLCviewer/data_storage'
+file_path = os.path.dirname(__file__)
 upload_data_folder = '/Users/hui/Documents/PycharmProjects/HPLCviewer/data_upload'
-temp_position = '/Users/hui/Documents/PycharmProjects/HPLCviewer/data_storage/temp'
+temp_position = file_path
 
 
-global data_index,info_deque_holder,current_time,temp_data_to_save,raw_data,axis_label_dict,user_pwd
+global data_index,info_deque_holder,current_time,temp_data_to_save,raw_data,axis_label_dict,user_pwd,copyed_runs
 user_pwd = {'hui':['h']}
 axis_label_dict = {'A': 'DAD signal / mA.U.', 'B':'Solvent B Gradient %' ,'P': 'Pressure / bar', 'default': 'Arbitrary Unit' }
 current_time = datetime.datetime.now()
 info_deque_holder = ['Welcome!']*3
 upload_file_source = ColumnDataSource({'file_contents':[],'file_name':[]})
 curve_type_options = ['A','B','P','A1','A2','A3']
+copyed_runs = []
 
 view_data_plot = figure(plot_width=1200,plot_height=300)
 view_data_plot.annulus(x=[1, 2, 3,4,5], y=[1, 2, 3,4,5], color="hotpink",inner_radius=0.2, outer_radius=0.5)
@@ -39,6 +39,33 @@ view_data_plot.add_glyph(updatenote,update_)
 
 
 class Data():
+    """
+    class to interact with shelve data storage.
+    data stored in shelvs as follows:
+    index : a dict contain experiment information; { ams5:{'name': 'experiment name','date': "20190101",'author':'jones'}, ams23:{}}
+    meta information and raw data of each experiment is under: "amsXX" and "amsXXraw"
+    meta information example:
+            'ams39':{
+            "ams39-run0": {
+                "speed": 1.0,
+                "date": "20190409",
+                "name": "PHENORP YPEGBS3 2-5V1RXN 0-5MMBS3 35C 1UG 5-60 28M 1MM",
+                "A": {
+                    "y_label": "DAD signal / mA.U.",
+                    "extcoef": 33.0
+                },
+                "B": {
+                    "y_label": "Solvent B Gradient %"
+                }
+            },
+            "ams39-run1": { }, "ams39-run2": { }}
+    raw data example:
+        ams39raw:{'ams39-run0':{'A':{'time':[0.0,39.99,6000]},'signal':[0,0.1,...]},'B':{'time':},'ams39-run1'}
+    when load in to Data Class,
+    index is loaded to data.index
+    meta information is loaded to data.experiment = {'ams39':{}}
+    raw data is loaded to data.experiment_raw = {'ams39':{}}  !!! caution: 'raw' tag is discarded during loading.
+    """
     def __init__(self,data_index):
         self.index = data_index
         self.experiment = {} # {ams0:{ams0-run1:{date: ,time: , A:{}}}}
@@ -98,13 +125,14 @@ def info_deque(text):
 
 def experiment_menu_generator(items):
     menu = []
+    dates = []
     for i in items:
         name = raw_data.index[i].get('name', 'No_Name')
         name = (name[:25]+'...') if len(name)>30 else name
-        menu.append(' '.join([raw_data.index[i].get('date', 'No_date')[-4:],name]))
+        menu.append(' '.join([raw_data.index[i].get('date', '000000')[-4:],name]))
+        dates.append(int(raw_data.index[i].get('date', '00000000')))
     result = list(zip(items, menu))
-    result = sorted(result, key=lambda x: int(
-        x[0].split('-')[0][3:]), reverse=True)
+    result = [i for _,i in sorted(zip(dates,result),reverse=True)]
     return result
 
 
@@ -126,7 +154,7 @@ def runs_menu_generator(items):
 
 
 # widgets
-tools_menu = [('Copy Analysis','copy'),('Paste Analysis','paste'),None,('Integrate','integrate'),('Annotate','annotate'),None,('Gaussian Fit','gaussian')]
+tools_menu = [('Copy Analysis','copy'),('Paste Analysis','paste'),None,('Integrate','integrate'),('Annotate','annotate'),None,('Cut Runs','copy_run'),('Paste Runs','paste_run')]
 mode_selection = RadioButtonGroup(labels=['Upload', 'View', 'Analyze'], button_type='success', width=250)
 edit_dropdown = Dropdown(label='Tool Kit', button_type='success',value='integrate',menu = tools_menu,width=150)
 info_box = PreText(text='Welcome!',width=400)
@@ -289,6 +317,46 @@ def paste_analysis():
         info_box.text = info_deque('Pasted to {}.'.format(ri))
     sync_plot(run_index,**vd_plot_options_fetcher())
 
+def copy_selected_run():
+    global copyed_runs
+    entry = sd_run_list.value
+    if mode_selection.active != 1:
+        info_box.text = info_deque('Go to View tab to cut.')
+        raise ValueError('go to view tab to cut.')
+    copyed_runs = entry.copy()
+    if not entry:
+        info_box.text = info_deque('No runs selected, clipboard cleared.')
+    else:
+        info_box.text = info_deque('{} runs in clipboard.'.format(len(copyed_runs)))
+
+def paste_selected_run():
+    global copyed_runs
+    if mode_selection.active != 1:
+        info_box.text = info_deque('Go to View tab to Paste.')
+        raise ValueError('go to view tab to Paste.')
+    target = sd_experiment_list.value
+    if len(target) != 1:
+        info_box.text = info_deque('Selecte only 1 Experiment to Paste to.')
+        raise ValueError('SELECT 1 exp to paste.')
+    if len(copyed_runs)==0:
+        info_box.text = info_deque('Clipboard is empty, Cut runs first.')
+        raise ValueError('SELECT before paste.')
+    target = target[0]
+    new_run = raw_data.next_run(target,len(copyed_runs))
+    try:
+        for i,j in zip(copyed_runs,new_run):
+            exp = i.split('-')[0]
+            raw_data.experiment[target].update({j:raw_data.experiment[exp].pop(i)})
+            raw_data.experiment_raw[target].update({j:raw_data.experiment_raw[exp].pop(i)})
+            raw_data.experiment_to_save.update({exp:'upload'})
+        raw_data.experiment_to_save.update({target:'upload'})
+        sd_run_list.options = runs_menu_generator([target])
+        info_box.text = info_deque('{} runs moved to {}.'.format(len(copyed_runs),target))
+        copyed_runs = []
+    except:
+        load_button_cb()
+        info_box.text = info_deque('Error occured during pasting. No changes were made.')
+        copyed_runs=[]
 
 def edit_dropdown_cb(attr,old,new):
     try:
@@ -300,6 +368,10 @@ def edit_dropdown_cb(attr,old,new):
             copy_analysis()
         elif new == 'paste':
             paste_analysis()
+        elif new == 'copy_run':
+            copy_selected_run()
+        elif new == 'paste_run':
+            paste_selected_run()
         else:
             pass
     except:
@@ -951,9 +1023,6 @@ def upload_file_source_cb(attr,old,new):
         data_dict_to_exp(data,index,run_index)
         upload_file_source.data={'file_contents':['none'],'file_name':['nofile']}
 
-
-
-
 def sd_save_data_cb():
     cur = time.time()
     file_list = sorted(glob.glob(os.path.join(temp_position,file_name+'*')))
@@ -1061,6 +1130,9 @@ def load_folder_to_experiment(exp_list):
     sd_experiment_list.options=experiment_menu_generator(raw_data.index.keys())
 
 def sd_folder_upload_cb():
+    """
+    call back function for upload data from folder button
+    """
     search=os.path.join(upload_data_folder,'[1-2][0][0-9]*')
     file_list = glob.glob(search)
     run_list = []
@@ -1101,8 +1173,8 @@ def vd_delete_data_button_cb():
     else:
         for i in exp_to_del:
             _= raw_data.index.pop(i,None)
-            _= raw_data.experiment.pop(i)
-            _= raw_data.experiment_raw.pop(i)
+            _= raw_data.experiment.pop(i,None)
+            _= raw_data.experiment_raw.pop(i,None)
             raw_data.experiment_to_save.update({i:'del'})
             sd_experiment_list.options = experiment_menu_generator(raw_data.index.keys())
             sd_experiment_list.value = []

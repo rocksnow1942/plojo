@@ -53,6 +53,15 @@ X17. save will have collision when more than one session is up. later save will 
 
 
 
+"""
+plojo-nior:
+
+1. add more description to code
+2. add function to copy and paste run to other experiments.
+
+
+
+
 
 """
 simuojo:
@@ -61,3 +70,5 @@ simuojo:
 1. fit HPLC data: ways to import data better.
 
 2. simulate IC50 data/ Kd data with cooperativity / IC50 data with cooperativity
+
+3. experiment list sort by experiment date.
