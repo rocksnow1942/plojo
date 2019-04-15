@@ -1,3 +1,6 @@
+
+plojo
+"""
 To do:
 X1.change save info feature: now only update the selected value in current experiment or DOI tab.
 
@@ -37,20 +40,25 @@ X17. save will have collision when more than one session is up. later save will 
     solved by using updating dictionary instead of overwrite whole file.
 
 
-16. better search funciton. search within previous filtered result.
+X15. new data storage architecture: use a index and shelf behind index.
+
+
+X16. better search funciton. search within previous filtered result.
     search using and / or
+
+X12. add more fitting methods. add hill slop to ic 50 and kd
 
 
 10. change curdoc add root to display different layout
 
 11. mark out lier with lasso select
 
-12. add more fitting methods. add hill slop to ic 50 and kd
 
 14. expandable MultiSelect
 
-15. new data storage architecture: use a index and shelf behind index.
+18. add function to download all fields of selected experiment to a csv file. (including notes, tags, dates, fitting result etc.)
 
+19. automatically save fitting result whenever fit and plot for the first time.
 
 
 """

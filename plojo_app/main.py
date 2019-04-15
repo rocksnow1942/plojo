@@ -171,6 +171,7 @@ def plot_generator(source=[],**kwargs):
     pn.title.text = 'Normalized Data '
     pn.title_location = 'above'
     fit_method_count=[0,0]
+    need_save_ = any([not raw_data.experiment[i].get('fit_para',False) for i in source])
     if len(source)>10:
         info_box.text = info_deque('Only first 10 selections will be plotted.')
     if len(source) == 1:
@@ -245,6 +246,8 @@ def plot_generator(source=[],**kwargs):
     pn.legend.background_fill_alpha = 0.1
     pn.plot_height = 400
     pn.plot_width = 600
+    if need_save_:
+        save_data()        
     return p, pn
 
 # fitting related functions
