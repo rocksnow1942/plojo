@@ -832,15 +832,21 @@ def plot_generator(plot_list=[],**kwargs):
     analysis_s = set([ k for j in [i.split('-') for i in analysis_s] for k in j])
     angle = 0.6
     x_offset = -10
+    integrate_offset_s = 15
+    integrate_offset_p = 15
     for i,run_index in enumerate(plot_list):
         cds_dict = generate_cds(run_index,**kwargs)
         tag = raw_data.experiment[run_index.split('-')[0]][run_index].get('note','')
         if use_colorp:
             p_color_touse = Category10[10][i % 10]
             s_color_touse = Category10[10][(i+3) % 10]
+            labelset_color_s = s_color_touse
+            labelset_color_p = p_color_touse
         else:
             p_color_touse = color_[primary_axis]
             s_color_touse = color_[secondary_axis]
+            labelset_color_s = 'black'
+            labelset_color_p = 'black'
 
         if secondary_axis != 'none':
             p_render_2=p.line('time','signal',source=cds_dict['run'][secondary_axis],alpha=alpha,line_width=1.5,color=s_color_touse,legend=run_index+' '+secondary_axis+' '+tag,y_range_name='secondary')
@@ -853,25 +859,24 @@ def plot_generator(plot_list=[],**kwargs):
             p.add_tools(p_data_hover)
 
         if secondary_axis != 'none':
-            integrate_offset = 15
             if 'integrate' in analysis_s:
-                p.multi_line(y_range_name='secondary',xs='integrate_gap_x',ys='integrate_gap_y',source=cds_dict['integrate'][secondary_axis],line_width=1,color='black')
+                p.multi_line(y_range_name='secondary',xs='integrate_gap_x',ys='integrate_gap_y',source=cds_dict['integrate'][secondary_axis],line_width=1,color=labelset_color_s)
             if 'area' in analysis_s:
-                int_labels = LabelSet(y_range_name='secondary',x='label_cordinate_x',y='label_cordinate_y',angle=angle, text='label_area', level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset, source=cds_dict['integrate'][secondary_axis], render_mode='canvas')
+                int_labels = LabelSet(y_range_name='secondary',x='label_cordinate_x',y='label_cordinate_y',angle=angle, text='label_area', level='glyph',text_font_size='9pt',text_color=labelset_color_s, x_offset=x_offset, y_offset=integrate_offset_s, source=cds_dict['integrate'][secondary_axis], render_mode='canvas')
                 p.add_layout(int_labels)
-                integrate_offset +=22
+                integrate_offset_s +=22
             if 'percent' in analysis_s:
-                int_labels = LabelSet(y_range_name='secondary',x='label_cordinate_x',y='label_cordinate_y',angle=angle, text='integrate_percent', level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset, source=cds_dict['integrate'][secondary_axis], render_mode='canvas')
+                int_labels = LabelSet(y_range_name='secondary',x='label_cordinate_x',y='label_cordinate_y',angle=angle, text='integrate_percent', level='glyph',text_font_size='9pt',text_color=labelset_color_s, x_offset=x_offset, y_offset=integrate_offset_s, source=cds_dict['integrate'][secondary_axis], render_mode='canvas')
                 p.add_layout(int_labels)
-                integrate_offset +=22
+                integrate_offset_s +=22
             if 'mass' in analysis_s:
-                int_labels = LabelSet(y_range_name='secondary',x='label_cordinate_x',y='label_cordinate_y',angle=angle, text='label_mass', level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset, source=cds_dict['integrate'][secondary_axis], render_mode='canvas')
+                int_labels = LabelSet(y_range_name='secondary',x='label_cordinate_x',y='label_cordinate_y',angle=angle, text='label_mass', level='glyph',text_font_size='9pt',text_color=labelset_color_s, x_offset=x_offset, y_offset=integrate_offset_s, source=cds_dict['integrate'][secondary_axis], render_mode='canvas')
                 p.add_layout(int_labels)
-                integrate_offset +=22
+                integrate_offset_s +=22
             if 'label' in analysis_s:
-                int_labels = LabelSet(y_range_name='secondary',x='label_cordinate_x',y='label_cordinate_y', angle=angle,text='label', level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset, source=cds_dict['integrate'][secondary_axis], render_mode='canvas')
+                int_labels = LabelSet(y_range_name='secondary',x='label_cordinate_x',y='label_cordinate_y', angle=angle,text='label', level='glyph',text_font_size='9pt', x_offset=x_offset, text_color=labelset_color_s,y_offset=integrate_offset_s, source=cds_dict['integrate'][secondary_axis], render_mode='canvas')
                 p.add_layout(int_labels)
-                integrate_offset +=22
+                integrate_offset_s +=22
             if 'annotate' in analysis_s:
                 for j in cds_dict['annotate'][secondary_axis]['arrow']:
                     p.add_layout(Arrow(y_range_name='secondary',end=VeeHead(size=8), line_color=s_color_touse,x_start=j[0], y_start=j[1]+j[2], x_end=j[0], y_end=j[1]))
@@ -879,25 +884,24 @@ def plot_generator(plot_list=[],**kwargs):
                 p.add_layout(anno_label)
 
         if primary_axis != 'none':
-            integrate_offset = 15
             if 'integrate' in analysis:
-                p.multi_line(xs='integrate_gap_x',ys='integrate_gap_y',source=cds_dict['integrate'][primary_axis],line_width=1,color='black')
+                p.multi_line(xs='integrate_gap_x',ys='integrate_gap_y',source=cds_dict['integrate'][primary_axis],line_width=1,color=labelset_color_p)
             if 'area' in analysis:
-                int_labels = LabelSet(x='label_cordinate_x',y='label_cordinate_y',angle=angle, text='label_area', level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset, source=cds_dict['integrate'][primary_axis], render_mode='canvas')
+                int_labels = LabelSet(x='label_cordinate_x',y='label_cordinate_y',angle=angle, text='label_area', text_color=labelset_color_p, level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset_p, source=cds_dict['integrate'][primary_axis], render_mode='canvas')
                 p.add_layout(int_labels)
-                integrate_offset +=22
+                integrate_offset_p +=22
             if 'percent' in analysis:
-                int_labels = LabelSet(x='label_cordinate_x',y='label_cordinate_y', angle=angle,text='integrate_percent', level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset, source=cds_dict['integrate'][primary_axis], render_mode='canvas')
+                int_labels = LabelSet(x='label_cordinate_x',y='label_cordinate_y', angle=angle,text='integrate_percent', text_color=labelset_color_p,level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset_p, source=cds_dict['integrate'][primary_axis], render_mode='canvas')
                 p.add_layout(int_labels)
-                integrate_offset +=22
+                integrate_offset_p +=22
             if 'mass' in analysis:
-                int_labels = LabelSet(x='label_cordinate_x',y='label_cordinate_y',angle=angle, text='label_mass', level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset, source=cds_dict['integrate'][primary_axis], render_mode='canvas')
+                int_labels = LabelSet(x='label_cordinate_x',y='label_cordinate_y',angle=angle, text='label_mass', text_color=labelset_color_p,level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset_p, source=cds_dict['integrate'][primary_axis], render_mode='canvas')
                 p.add_layout(int_labels)
-                integrate_offset +=22
+                integrate_offset_p +=22
             if 'label' in analysis:
-                int_labels = LabelSet(x='label_cordinate_x',y='label_cordinate_y', angle=angle,text='label', level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset, source=cds_dict['integrate'][primary_axis], render_mode='canvas')
+                int_labels = LabelSet(x='label_cordinate_x',y='label_cordinate_y', angle=angle,text='label', text_color=labelset_color_p,level='glyph',text_font_size='9pt', x_offset=x_offset, y_offset=integrate_offset_p, source=cds_dict['integrate'][primary_axis], render_mode='canvas')
                 p.add_layout(int_labels)
-                integrate_offset +=22
+                integrate_offset_p +=22
             if 'annotate' in analysis:
                 for j in cds_dict['annotate'][primary_axis]['arrow']:
                     p.add_layout(Arrow(end=VeeHead(size=8), line_color=p_color_touse,x_start=j[0], y_start=j[1]+j[2], x_end=j[0], y_end=j[1]))

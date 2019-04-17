@@ -247,7 +247,7 @@ def plot_generator(source=[],**kwargs):
     pn.plot_height = 400
     pn.plot_width = 600
     if need_save_:
-        save_data()        
+        save_data()
     return p, pn
 
 # fitting related functions
