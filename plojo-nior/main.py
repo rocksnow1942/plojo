@@ -1,8 +1,8 @@
 from bokeh.plotting import figure, ColumnDataSource
 from bokeh.io import curdoc
-from bokeh.models import HoverTool, Plot,CustomJS,LinearAxis, Range1d,LabelSet,Arrow,VeeHead
+from bokeh.models import HoverTool, Plot,CustomJS,LinearAxis, Range1d,LabelSet,Arrow,VeeHead,BoxSelectTool,Rect
 from bokeh.models.glyphs import Text
-from bokeh.models.widgets import Panel, Tabs, Button, TextInput, Select, MultiSelect, RadioButtonGroup, PasswordInput, PreText, DataTable, TableColumn, TextAreaInput,Dropdown,Div,CheckboxGroup
+from bokeh.models.widgets import Panel, Tabs, Button, TextInput, Select, MultiSelect, RadioButtonGroup, PasswordInput, PreText, TextAreaInput,Dropdown,Div,Toggle
 from bokeh.layouts import widgetbox, row, column, layout
 from bokeh.palettes import Category10
 import shelve
@@ -16,7 +16,6 @@ import numpy as np
 import copy
 from utils import file_name,file_path,upload_data_folder,temp_position
 
-
 global data_index,info_deque_holder,current_time,temp_data_to_save,raw_data,axis_label_dict,user_pwd,copyed_runs
 user_pwd = {'hui':['h']}
 axis_label_dict = {'A': 'DAD signal / mA.U.', 'B':'Solvent B Gradient %' ,'P': 'Pressure / bar', 'default': 'Arbitrary Unit' }
@@ -28,7 +27,7 @@ copyed_runs = []
 
 view_data_plot = figure(plot_width=1200,plot_height=300)
 view_data_plot.annulus(x=[1, 2, 3,4,5], y=[1, 2, 3,4,5], color="hotpink",inner_radius=0.2, outer_radius=0.5)
-updatenote = ColumnDataSource(dict(x=[1],y=[3.7],text=['Update:\n 1.Add Repair tool to repair previous broken data due to integration bug. \n2. Add tools to copy and paste run.\n 3. Integration bugs fixed.']))
+updatenote = ColumnDataSource(dict(x=[1],y=[3.7],text=['Update:\n 1.Added box selection tool. \n 2. Align curves by box select or manual align.\n 3. Select Integrate coordinate by box select tool.']))
 update_ = Text(x='x', y='y', text='text',text_font_size='12pt',text_font='helvetica')
 view_data_plot.add_glyph(updatenote,update_)
 
@@ -194,7 +193,94 @@ vd_secondary_axis_range = TextInput(title = 'Secondary Axis Range',value='0-100'
 vd_div_0 = Div(text='',width=50)
 vd_plot_backend = Select(title='Plot Format', value='PNG',options = ['PNG','SVG'],width = 170)
 vd_offset_option = TextInput(title = 'Secondary Axis Offset',value='0',width=150)
-vd_plot_options = row(widgetbox(vd_primary_axis_option,vd_secondary_axis_option,vd_secondary_axis_range,vd_offset_option,width=200),column(row(vd_anotation_option,vd_anotation_option_s),vd_plot_backend))
+
+vd_curve_selection = Select(title='Curve to adjust',value=None,options=[],width=200)
+vd_curve_offset = TextInput(title='X_Offset, Y_offset, Scale:',value='0',width=200)
+vd_auto_align = Button(label = 'Auto Align',button_type='success',width=200)
+
+vd_align_mode = Toggle(label="Align Mode", button_type="success",width=200)
+
+def vd_align_mode_cb(status):
+    on = 'ON' if status else 'OFF'
+    info_box.text=info_deque('Switch Align Mode {}.'.format(on))
+    run_index = sd_run_list.value
+    sync_plot(run_index,**vd_plot_options_fetcher())
+
+def vd_curve_selection_cb(attr,old,new):
+    if new:
+        curve=vd_primary_axis_option.value
+        index = new.split('-')[0]
+        curve_dict = raw_data.experiment[index][new][curve]
+        vd_curve_offset.value=','.join([str(i) for i in curve_dict.get('align_offset',(0,0,1))])
+
+def vd_curve_offset_cb(attr,old,new):
+    try:
+        new = [float(i) for i in new.split(',')]
+        assert len(new)==3
+    except:
+        info_box.text = info_deque('Wrong Offset Format. Use X_offset,Y_offset,Scale ')
+        raise ValueError('wrong offset format.')
+    curve=vd_primary_axis_option.value
+    run_index=vd_curve_selection.value
+    index = run_index.split('-')[0]
+    curve_dict = raw_data.experiment[index][run_index][curve]
+    old_offset = curve_dict.get('align_offset',(0,0,1))
+    if new != old_offset:
+        curve_dict.update(align_offset=new)
+        raw_data.experiment_to_save.update({index:'sync'})
+        sync_plot(sd_run_list.value,**vd_plot_options_fetcher())
+
+def vd_auto_align_cb():
+    """
+    align to curve selected in curve to adjust.
+    """
+    x=box_select_source.data['x']
+    w=box_select_source.data['width']
+    if len(x)==0:
+        info_box.text=info_deque('Box Select Region to align.')
+        return None
+    x1,x2=x[0]-0.5*w[0],x[0]+0.5*w[0]
+    runindexlist = sd_run_list.value.copy()
+    curve=vd_primary_axis_option.value
+    toalign = vd_curve_selection.value
+    if len(runindexlist)==1:
+        info_box.text = info_deque('Select more than 1 curve to align.')
+        return None
+    raw_data.experiment_to_save.update([(i.split('-')[0],'sync') for i in runindexlist])
+    toalign_run = toalign.split('-')[0]
+    time=raw_data.experiment_raw[toalign_run][toalign][curve]['time']
+    signal=raw_data.experiment_raw[toalign_run][toalign][curve]['signal']
+    raw_data.experiment[toalign_run][toalign][curve].update(align_offset=[0,0,1])
+    timesignal=sorted([i for i in zip(np.linspace(*time),signal) if x1<i[0]<x2],key=lambda x:x[1])
+    _min,_max=timesignal[0][1],timesignal[-1][1]
+    maxtime=np.mean([i[0] for i in timesignal if i[1]>0.999*_max])
+    maxsignal=timesignal[-1][1]
+    minsignal=np.median([i[1] for i in timesignal if i[1]<(_min+0.01*(_max-_min))])
+    runindexlist.remove(toalign)
+    indexlist = [i.split('-')[0] for i in runindexlist]
+    for index,runindex in zip(indexlist,runindexlist):
+        time=raw_data.experiment_raw[index][runindex][curve]['time']
+        signal=raw_data.experiment_raw[index][runindex][curve]['signal']
+        timesignal= sorted([i for i in zip(np.linspace(*time),signal) if x1<i[0]<x2],key=lambda x:x[1])
+        _min,_max=timesignal[0][1],timesignal[-1][1]
+        tempmaxtime=np.mean([i[0] for i in timesignal if i[1]>0.999*_max])
+        tempmaxsignal=timesignal[-1][1]
+        tempminsignal=np.median([i[1] for i in timesignal if i[1]<(_min+0.01*(_max-_min))])
+        x_offset = maxtime-tempmaxtime
+        scale=(maxsignal-minsignal)/(tempmaxsignal-tempminsignal)
+        y_offset=minsignal/scale-tempminsignal
+        raw_data.experiment[index][runindex][curve].update(align_offset=[x_offset,y_offset,scale])
+    sync_plot(sd_run_list.value,**vd_plot_options_fetcher())
+    vd_curve_offset.value=','.join([str(i) for i in raw_data.experiment[toalign_run][toalign][curve].get('align_offset',(0,0,1))])
+    info_box.text = info_deque('Align done.')
+
+vd_auto_align.on_click(vd_auto_align_cb)
+vd_align_mode.on_click(vd_align_mode_cb)
+vd_curve_selection.on_change('value',vd_curve_selection_cb)
+vd_curve_offset.on_change('value',vd_curve_offset_cb)
+
+vd_align_widgets = widgetbox(vd_align_mode,vd_curve_selection,vd_curve_offset,vd_auto_align)
+vd_plot_options = row(widgetbox(vd_primary_axis_option,vd_secondary_axis_option,vd_secondary_axis_range,vd_offset_option,width=200),column(row(vd_anotation_option,vd_anotation_option_s,vd_div_0),vd_plot_backend),column(vd_align_widgets))
 # vd_plot_options = row(column(vd_primary_axis_option,vd_secondary_axis_option,vd_secondary_axis_range),vd_div_0,column(row(vd_anotation_option,vd_anotation_option_s),vd_offset_option))
 vd_selection_tab = Tabs(active=0, width=800, height=280, tabs=[Panel(child=row(sd_experiment_list,sd_run_list), title="Experiment"),Panel(child=vd_plot_options,title='Plot Options')])
 vd_div_1 = Div(text='',width=50)
@@ -768,20 +854,24 @@ vd_run_note.on_change('value',vd_run_note_cb)
 
 
 def generate_cds(run_index,**kwargs):
+    secondary_axis=kwargs.get('secondary_axis','B')
+    primary_axis = kwargs.get('primary_axis','A')
+    align_mode = kwargs.get('align_mode',False)
     offset_curve,offset = kwargs.get('offset',('A',0))
     index = run_index.split('-')[0]
     run_speed = raw_data.experiment[index][run_index].get('speed',0)
     run = raw_data.experiment[index][run_index]
     run_raw = raw_data.experiment_raw[index][run_index]
-    run_dict = dict.fromkeys(set(curve_type_options))
-    integration_dict = dict.fromkeys(set(curve_type_options))
-    annotate = dict.fromkeys(set(curve_type_options))
+    curve_type_options=[primary_axis,secondary_axis]
+    run_dict = dict.fromkeys(curve_type_options)
+    integration_dict = dict.fromkeys(curve_type_options)
+    annotate = dict.fromkeys(curve_type_options)
     for curve in curve_type_options:
         curve_dict = run.get(curve,{})
         extinction_coeff = curve_dict.get('extcoef',0)
         curve_dict_raw = run_raw.get(curve,{})
         curve_time = np.linspace(*curve_dict_raw.get('time',(0,0,1)))+offset*int(curve==offset_curve)
-        curve_signal = curve_dict_raw.get('signal',[0])
+        curve_signal =  curve_dict_raw.get('signal',[0])
         curve_integrate = curve_dict.get('integrate',{})
         integrate_gap_x=curve_integrate.get('integrate_gap_x',[])
         integrate_gap_y=curve_integrate.get('integrate_gap_y',[])
@@ -794,19 +884,70 @@ def generate_cds(run_index,**kwargs):
         label_mass = ['{:.4g}ug'.format(i*extinction_coeff*run_speed/1000) for i in label_]
         temp_cds = ColumnDataSource( {'time':curve_time,'signal':curve_signal})
         integration_cds = ColumnDataSource({'integrate_percent':integrate_percent,'integrate_gap_x':integrate_gap_x,'integrate_gap_y':integrate_gap_y,'label_cordinate_x':label_cordinate_x,'label_cordinate_y':label_cordinate_y,'label_area':label_area,'label_mass':label_mass,'label':label})
-        run_dict.update({curve:temp_cds})
-        integration_dict.update({curve:integration_cds})
+
         # generate annotate
         annotate_dict = curve_dict.get('annotate',{})
         anno_height,anno_x,anno_y,anno_label = [annotate_dict.get(i,[]) for i in ['height','x','y','label']]
         label_data_source = ColumnDataSource({'label_x':anno_x,'label_y':[i+j for i,j in zip(anno_y,anno_height)],'label':anno_label})
         arrow_position = [i for i in zip(anno_x,anno_y,anno_height) ]
+
+        if (curve == primary_axis) and align_mode:
+            x_offset,y_offset,scale = curve_dict.get('align_offset',(0,0,1))
+            temp_cds.data['time']=temp_cds.data['time']+x_offset
+            temp_cds.data['signal']=(np.array(temp_cds.data['signal'])+y_offset)*scale
+            # for i in ['integrate_gap_x','integrate_gap_y','label_cordinate_x','label_cordinate_y']:
+            integration_cds.data['integrate_gap_x']=list(np.array(integration_cds.data['integrate_gap_x'])+x_offset)
+            integration_cds.data['integrate_gap_y']=list((np.array(integration_cds.data['integrate_gap_y'])+y_offset)*scale)
+            integration_cds.data['label_cordinate_x']=np.array(integration_cds.data['label_cordinate_x'])+x_offset
+            integration_cds.data['label_cordinate_y']=(np.array(integration_cds.data['label_cordinate_y'])+y_offset)*scale
+            label_data_source.data['label_x']=np.array(label_data_source.data['label_x'])+x_offset
+            label_data_source.data['label_y']=(np.array(label_data_source.data['label_y'])+y_offset)*scale
+            arrow_position=[(i[0]+x_offset,(i[1]+y_offset)*scale,i[2]*scale) for i in arrow_position]
+
+        run_dict.update({curve:temp_cds})
+        integration_dict.update({curve:integration_cds})
         annotate.update({curve:{'label':label_data_source,'arrow':arrow_position}})
     return {'run':run_dict,'integrate':integration_dict,'annotate':annotate}
 
 
 
+box_select_source = ColumnDataSource(data=dict(x=[], y=[], width=[], height=[]))
+
+def box_select_source_cb(attr,old,new):
+    if mode_selection.active == 2:
+        if len(new['x'])>0:
+            it_start_x.value=str(new['x'][0]-0.5*new['width'][0])
+            it_end_x.value=str(new['x'][0]+0.5*new['width'][0])
+            an_x.value=str(new['x'][0])
+
+
+
+box_select_source.on_change('data',box_select_source_cb)
+
+
+box_select_callback = CustomJS(args=dict(source=box_select_source), code="""
+        // get data source from Callback args
+
+
+        /// get BoxSelectTool dimensions from cb_data parameter of Callback
+        var geometry = cb_data['geometry'];
+
+        /// calculate Rect attributes
+        var width = geometry['x1'] - geometry['x0'];
+        var height = geometry['y1'] - geometry['y0'];
+        var x = geometry['x0'] + width/2;
+        var y = geometry['y0'] + height/2;
+
+        /// update data source with new Rect attributes
+        source.data={'x':[x],'y':[y],'width':[width],'height':[height]};
+        // emit update of data source
+        source.change.emit();
+
+    """)
+
+
 def plot_generator(plot_list=[],**kwargs):
+    box_select_source.data=dict(x=[], y=[], width=[], height=[]) # empty the data.
     plot_backend = kwargs.get('plot_backend','canvas')
     primary_axis = kwargs.get('primary_axis','A')
     secondary_axis=kwargs.get('secondary_axis','B')
@@ -820,6 +961,7 @@ def plot_generator(plot_list=[],**kwargs):
         use_colorp = False
         alpha = 0.9
     p=figure(plot_width=1200,plot_height=300,tools=tools_list,toolbar_location='above')
+
     p.toolbar.active_inspect = None
     p.output_backend=plot_backend
     p.xaxis.axis_label = 'Run Time /min'
@@ -910,6 +1052,15 @@ def plot_generator(plot_list=[],**kwargs):
     p.legend.click_policy = 'hide'
     p.legend.border_line_alpha = 0
     p.legend.background_fill_alpha = 0.1
+    box_select = BoxSelectTool(callback=box_select_callback,renderers=[p_render])
+    p.add_tools(box_select)
+    rect = Rect(x='x',
+                y='y',
+                width='width',
+                height='height',
+                fill_alpha=0.1,
+                fill_color='green')
+    p.add_glyph(box_select_source, rect, selection_glyph=rect, nonselection_glyph=rect)
     return p
 
 
@@ -924,6 +1075,7 @@ def vd_plot_options_fetcher():
     annotation = vd_anotation_option.value
     annotation_s = vd_anotation_option_s.value
     plot_format = 'canvas' if vd_plot_backend.value=='PNG' else 'svg'
+    align_mode = vd_align_mode.active
     try:
         a=vd_secondary_axis_range.value.split('-')
         if len(a)>2:
@@ -935,12 +1087,14 @@ def vd_plot_options_fetcher():
         info_box.text = info_deque('enter valid plot options')
         sa_range = (0,100)
         offset = ('A',0)
-    return dict(offset=offset,plot_backend=plot_format,primary_axis=pa,secondary_axis=sa,analysis=annotation,analysis_s=annotation_s,secondary_axis_range=sa_range)
+    return dict(align_mode=align_mode,offset=offset,plot_backend=plot_format,primary_axis=pa,secondary_axis=sa,analysis=annotation,analysis_s=annotation_s,secondary_axis_range=sa_range)
 
 def sd_run_list_cb(attr,old,new):
     if mode_selection.active != 0 and new:
         sync_plot(new,**vd_plot_options_fetcher())
         sync_vd_run_info_widgets(new)
+        vd_curve_selection.options=new
+        vd_curve_selection.value = new[-1] if new else None
     else:
         pass
 
@@ -1063,8 +1217,6 @@ def sd_data_generator():
             info_box.text = info_deque('Wrong uploaded.')
             result_dict = 'none'
     return result_dict
-
-
 
 def data_dict_to_exp(data,index,run_index):
     if run_index == 'new':
