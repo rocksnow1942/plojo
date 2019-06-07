@@ -700,6 +700,15 @@ def edit_dropdown_cb(attr,old,new):
             paste_selected_run()
         elif new == 'check':
             check_selected_runs()
+        elif new == 'integrateall':
+            if len(box_select_source.data['x'])!=0:
+                for run_index in sd_run_list.value:
+                    _it_add_button_cb(run_index)
+                plot_para = vd_plot_options_fetcher()
+                sync_plot(sd_run_list.value,**plot_para)
+                info_box.text=info_deque('Integrated {} curves.'.format(len(sd_run_list.value)))
+            else:
+                info_box.text=info_deque('Make a box selection.')
         else:
             pass
     except:
@@ -708,24 +717,41 @@ def edit_dropdown_cb(attr,old,new):
         edit_dropdown.value = 'none'
 
 def it_add_button_cb():
+    run_index = sd_run_list.value[0]
+    curve = vd_primary_axis_option.value
+    _it_add_button_cb(run_index)
+    it_integration_list.options = it_integration_list_menu_generator(run_index,curve)
+    it_integration_list.value = [it_integration_list.options[-1][0]]
+    plot_para = vd_plot_options_fetcher()
+    plot_para.update(analysis=['integrate-area','integrate-mass','integrate-label','integrate-percent'])
+    sync_plot([run_index],**plot_para)
+
+
+
+
+def _it_add_button_cb(run_index):
     """
     add integration
     """
-    run_index = sd_run_list.value[0]
     index= run_index.split('-')[0]
     curve = vd_primary_axis_option.value
     label = it_integration_name.value
+    offset = raw_data.experiment[index][run_index][curve].get('align_offset',(0,0,1))
     try:
         # raw_data.experiment[index][run_index].update(extcoef=float(it_ext_coef.value))
         xs= float(it_start_x.value)
         xe= float(it_end_x.value)
         ys = float(it_start_y.value)
         ye = float(it_end_y.value)
+        if vd_align_mode.active:
+            xs-=offset[0]
+            xe-=offset[0]
     except:
         info_box.text = info_deque('enter valid numbers')
         raise ValueError('wrong input')
-    it_para_check(xe,run_index,curve,xs)
     inte_para= (xs,xe,ys,ye)
+    it_para_check(xe,run_index,curve,xs)
+
     target = raw_data.experiment[index][run_index][curve]
     if not target.get('integrate',{}):
         target.update(integrate={'inte_para':[inte_para],'integrate_gap_x':[],'integrate_gap_y':[],'label_cordinate_x':[],'label_cordinate_y':[],'area':[],'label':[label]})
@@ -733,11 +759,6 @@ def it_add_button_cb():
         target['integrate']['inte_para'].append(inte_para)
         target['integrate']['label'].append(label)
     generate_integration_from_para(run_index,curve)
-    plot_para = vd_plot_options_fetcher()
-    plot_para.update(analysis=['integrate-area','integrate-mass','integrate-label','integrate-percent'])
-    sync_plot([run_index],**plot_para)
-    it_integration_list.options = it_integration_list_menu_generator(run_index,curve)
-    it_integration_list.value = [it_integration_list.options[-1][0]]
     raw_data.experiment_to_save.update({index:'sync'})
 
 def it_update_button_cb():
@@ -902,7 +923,7 @@ def vd_run_ext_coef_cb(attr,old,new):
     info_change_keep.update(run_extcoef=True)
 
 def box_select_source_cb(attr,old,new):
-    if mode_selection.active == 2:
+    if mode_selection.active != 0:
         if len(new['x'])>0:
             it_start_x.value=str(new['x'][0]-0.5*new['width'][0])
             it_end_x.value=str(new['x'][0]+0.5*new['width'][0])
@@ -1243,7 +1264,7 @@ input.click();
 
 
 # plojo layout elements and widgets
-tools_menu = [('Copy Analysis','copy'),('Paste Analysis','paste'),None,('Integrate','integrate'),('Annotate','annotate'),None,('Cut Runs','copy_run'),('Paste Runs','paste_run'),('Repair Broken Data','check')]
+tools_menu = [('Copy Analysis','copy'),('Paste Analysis','paste'),None,('Integrate','integrate'),('Annotate','annotate'),None,('Integrate All Curves','integrateall'),None,('Cut Runs','copy_run'),('Paste Runs','paste_run'),('Repair Broken Data','check')]
 mode_selection = RadioButtonGroup(labels=['Upload', 'View', 'Analyze'], button_type='success', width=250)
 edit_dropdown = Dropdown(label='Tool Kit', button_type='success',value='integrate',menu = tools_menu,width=150)
 info_box = PreText(text='Welcome!',width=400)
@@ -1418,7 +1439,6 @@ it_delete_button.on_click(it_delete_button_cb)
 login_btn.on_click(login_btn_callback)
 login_pwd.on_change('value',login_pwd_cb)
 sd_file_upload.callback = sd_file_upload_callback
-
 
 #organize layouts
 

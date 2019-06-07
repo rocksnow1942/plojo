@@ -3,20 +3,12 @@ from os import path
 import shelve
 from bokeh.plotting import figure, ColumnDataSource
 from bokeh.models import HoverTool,Slider,RangeSlider
-from bokeh.models.widgets import Button, TextInput,PreText
+from bokeh.models.widgets import Button, TextInput,PreText,Div
 from bokeh.layouts import widgetbox
 import numpy as np
-
-
-file_save_location = path.join('/Users/hui/Documents/PycharmProjects/plojo/plojo_app','data')
-temp_position=path.join(file_save_location,'temp')
-file_name = 'plojo_data'
-
+from _utils import file_save_location,file_name
 
 class Data():
-    file_save_location = path.join('/Users/hui/Documents/PycharmProjects/simuojo','data_storage')
-    temp_position=path.join(file_save_location,'temp')
-    file_name = 'plojo_data'
     def __init__(self,data_index):
         self.index = data_index #{0-vegf:set(), 1-Ang2:set()}
         self.experiment = {} # {ams0:{},ams1:{}}
@@ -149,7 +141,12 @@ class ic50_simu():
         self.slider_sets.on_change('value',self.callback)
         refresh_button.on_click(self.refresh_button_cb)
         add_button.on_click(self.add_button_cb)
-        self.layout =([self.p,self.pn],[para_input,para_slider,rand_opt])
+        bottom= Div(text="""
+        <div style="text-align:center;">
+        <p><a href="http://www.aptitudemedical.com/index.html">Aptitude Medical Systems, Inc.</a> </p>
+        </div>
+        """,width=800,height=20)
+        self.layout =([self.p,self.pn],[para_input,para_slider,rand_opt],[bottom])
 
     def rv_solver(self,a_0, r_0, v_0, kd_r, kd_a):
         a=kd_a-kd_r
@@ -334,7 +331,12 @@ class DR_5PL():
         self.slider_sets.on_change('value',self.callback)
         refresh_button.on_click(self.refresh_button_cb)
         add_button.on_click(self.add_button_cb)
-        self.layout =([self.p],[para_input,para_slider,rand_opt])
+        bottom= Div(text="""
+        <div style="text-align:center;">
+        <p><a href="http://www.aptitudemedical.com/index.html">Aptitude Medical Systems, Inc.</a> </p>
+        </div>
+        """,width=800,height=20)
+        self.layout =([self.p],[para_input,para_slider,rand_opt],[bottom])
 
 
     def randomizer(self,signal,linear=0.001, proportional=0.001,seed=42):
@@ -479,7 +481,12 @@ class Kd_simu():
         self.slider_sets.on_change('value',self.callback)
         self.refresh_button.on_click(self.refresh_button_cb)
         self.add_button.on_click(self.add_button_cb)
-        self.layout = ([self.p],[opt_input,options,rand_opt])
+        bottom= Div(text="""
+        <div style="text-align:center;">
+        <p><a href="http://www.aptitudemedical.com/index.html">Aptitude Medical Systems, Inc.</a> </p>
+        </div>
+        """,width=800,height=20)
+        self.layout = ([self.p],[opt_input,options,rand_opt],[bottom])
 
     def callback(self,attr,old,new):
         self.fit_data.data = self.generate_data(**self.fetch_para(False))
@@ -624,7 +631,12 @@ class ric50_simu():
         self.slider_sets.on_change('value',self.callback)
         refresh_button.on_click(self.refresh_button_cb)
         add_button.on_click(self.add_button_cb)
-        self.layout =([self.p],[para_input,para_slider,rand_opt])
+        bottom= Div(text="""
+        <div style="text-align:center;">
+        <p><a href="http://www.aptitudemedical.com/index.html">Aptitude Medical Systems, Inc.</a> </p>
+        </div>
+        """,width=800,height=20)
+        self.layout =([self.p],[para_input,para_slider,rand_opt],[bottom])
 
     def rv_solver(self,a_0, r_0, v_0, kd_r, kd_a):
         a=kd_a-kd_r
@@ -676,7 +688,7 @@ class ric50_simu():
             rv_per = self.randomizer(np.repeat(rv_per,sets),linear=linear,proportional=proportional,**kwargs)
             result_={'a_0':np.repeat(a_0,sets), 'rv_per':rv_per}
         else:
-            result_ = {'a_0':a_0, 'rv_per':rv_per, 'rv':rv*1000000,'kd_2':[kd_2]*len(a_0)}
+            result_ = {'a_0':a_0, 'rv_per':rv_per} #, 'rv':rv*1000000,'kd_2':[kd_2]*len(a_0)
         return result_
 
     def fetch_para(self,randomize):
@@ -742,6 +754,198 @@ class ric50_simu():
         tags = self.title_generator(para)
         notes = self.title_generator(para) + '; R_l:{:.3g}; R_p:{:.3g}'.format(self.fetch_para(True)['linear'],self.fetch_para(True)['proportional'])
         dict_tosave = dict(date='SimuDate',concentration=concentration,signal=signal,tag=tags,note=notes,fit_method='ric_50',author='simu',name=name)
+        plojo_data.experiment[new_entry]=dict_tosave
+        plojo_data.index[new_index].add(new_entry)
+        plojo_data.experiment_to_save.update({new_entry:'sync'})
+        plojo_data.save_experiment()
+        self.p.title.text='Data Saved to plojo.'
+
+
+
+
+class ri50_coop_simu():
+    def __init__(self):
+        para_text = PreText(text='Binding Parameters')
+        para_text_ = PreText(text='Binding Parameters')
+        self.v0 = Slider(title='VEGF concentration (nM)', start=-3, end=3, step=0.01, value=0)
+        self.ka1 = Slider(title='Aptamer+VEGF  Kd1 (nM)', start=-3, end=3, step=0.01, value=0)
+        self.ka2 = Slider(title='Aptamer+VEGF  Kd2 (nM)', start=-3, end=3, step=0.01, value=0)
+        self.kr1 = Slider(title='Receptor+VEGF Kd1 (nM)', start=-3, end=3, step=0.01, value=0)
+        self.kr2 = Slider(title='Receptor+VA   Kd2 (nM)', start=-3, end=3, step=0.01, value=0)
+        self.kr3 = Slider(title='Receptor+VA2  Kd3 (nM)', start=-3, end=3, step=0.01, value=0)
+        self.c1 = Slider(title='Receptor-VA Signal %', start=0, end=1, step=0.01, value=0.2)
+        self.c2 = Slider(title='Receptor-VA2 Signal %', start=0, end=1, step=0.01, value=0.1)
+        self.FminFmax = RangeSlider(title = 'Signal Range AU', start =0, end =100000,step =1000,value =(1000,10000))
+
+        self.name_input = TextInput(title='Create Name for the data',value='Simu_RIC50_Coop')
+
+        self.input_v0  = TextInput(value="1",title="VEGF concentration (nM)")
+        self.input_ka1 = TextInput(value="1",title="Aptamer+VEGF  Kd1 (nM)")
+        self.input_ka2 = TextInput(value="1",title='Aptamer+VEGF  Kd2 (nM)')
+        self.input_kr1 = TextInput(value="1",title="Receptor+VEGF Kd1 (nM)")
+        self.input_kr2 = TextInput(value="1",title="Receptor+VA   Kd2 (nM)")
+        self.input_kr3 = TextInput(value="1",title="Receptor+VA2  Kd3 (nM)")
+
+
+        rand_text = PreText(text='Randomization Parameters')
+        self.slider_conc_range =RangeSlider(title= 'Experiment Conc. (log nM) : ',  start = -5, end=5, step=0.01,value=(-2,2))
+        self.slider_points = Slider(title='Number of concentration points: ', start = 3, end=20, step=1,value=9)
+        self.slider_sets = Slider(title='Number of replicates:',start=1,end=9,step=1,value=1)
+        self.slider_linear = Slider(title='Linear randomization', start = 0, end=25, step=0.1, value=0.2)
+        self.slider_proportional = Slider(title='Proportional randomization', start = 0, end=25, step=0.1,value=0.2)
+
+        self.input = {'v0':self.input_v0,'ka1':self.input_ka1,'ka2':self.input_ka2,'kr1':self.input_kr1,'kr2':self.input_kr2,'kr3':self.input_kr3}
+        self.slidername = ['v0','ka1','ka2','kr1','kr2','kr3','c1','c2','points','sets','linear','proportional']
+        self.sliders =[self.v0,self.ka1,self.ka2,self.kr1,self.kr2,self.kr3,self.c1,self.c2,self.slider_points,self.slider_sets,self.slider_linear,self.slider_proportional]
+        self.slidersdict = dict(zip(self.slidername,self.sliders))
+        refresh_button = Button(label='Refresh Random',button_type='success')
+        add_button = Button(label='Add data to plojo',button_type='success')
+        para_slider = widgetbox(para_text,self.v0,self.ka1,self.ka2,self.kr1,self.kr2,self.kr3,self.c1 ,self.c2, self.FminFmax)
+        para_input = widgetbox(para_text_,self.input_v0,self.input_ka1,self.input_ka2,self.input_kr1,self.input_kr2,self.input_kr3)
+        rand_opt = widgetbox(rand_text,self.slider_conc_range,self.slider_points,self.slider_sets,self.slider_linear,self.slider_proportional,self.name_input,refresh_button,add_button)
+
+        self.fit_data = ColumnDataSource(data=self.generate_plotdata(**self.fetch_para(False)))
+        self.raw_data = ColumnDataSource(data=self.generate_plotdata(**self.fetch_para(True)))
+        self.p = figure(x_axis_label='Aptamer (nM)', y_axis_label='Receptor-VEGF Signal/A.U.', x_axis_type='log')
+        self.p.title.text = 'Receptor-VEGF RIC50 with Cooperativity'
+        self.p.title_location='above'
+        p_1=self.p.line('a0','signal', source=self.fit_data,line_color='green',line_width=2,legend='Signal_All')
+        hover_tool_1 = HoverTool(renderers=[p_1],tooltips=[('Aptamer/nM', '@a0{0.00}'),( 'Signal', '@signal{0.00}' )],mode='vline')
+        self.p.add_tools(hover_tool_1)
+        p_2 = self.p.line('a0','signal_v', source=self.fit_data,line_color='deepskyblue',line_width=1,line_dash='dotdash',legend='Signal_V')
+        hover_tool_2 = HoverTool(renderers=[p_2],tooltips=[( 'Signal_V', '@signal_v{0.00}' )],mode='vline')
+        self.p.add_tools(hover_tool_2)
+        p_3 = self.p.line('a0','signal_va', source=self.fit_data,line_color='lime',line_width=1,line_dash='dotdash',legend='Signal_VA')
+        hover_tool_3 = HoverTool(renderers=[p_3],tooltips=[( 'Signal_VA', '@signal_va{0.00}' )],mode='vline')
+        self.p.add_tools(hover_tool_3)
+        p_4 = self.p.line('a0','signal_va2', source=self.fit_data,line_color='deeppink',line_width=1,line_dash='dotdash',legend='Signal_VA2')
+        hover_tool_4 = HoverTool(renderers=[p_4],tooltips=[( 'Signal_VA2', '@signal_va2{0.00}' )],mode='vline')
+        self.p.add_tools(hover_tool_4)
+        self.p.circle('a0','signal',source=self.raw_data,color='red',line_width=3,legend='Signal_All')
+        self.p.plot_height = 400
+        self.p.plot_width = 600
+        self.p.legend.click_policy = 'hide'
+        self.p.legend.location = 'top_right'
+        self.p.legend.border_line_alpha = 0
+        self.p.legend.background_fill_alpha = 0.1
+        self.pn=figure(x_axis_label='Aptamer (nM)', y_axis_label='Solution VEGF-Aptamer Complex %', x_axis_type='log')
+        self.pn.title.text = 'VEGF-Aptamer Complex / [VEGF]0 % in Solution'
+        self.pn.title_location='above'
+        p_5=self.pn.line('a0','v', source=self.fit_data,line_color='deepskyblue',line_dash='dotdash',line_width=2,legend='VEGF')
+        hover_tool_5 = HoverTool(renderers=[p_5],tooltips=[('Aptamer/nM', '@a0{0.00}'),( 'VEGF/%', '@v{0.0}' )],mode='vline')
+        self.pn.add_tools(hover_tool_5)
+        p_6=self.pn.line('a0','va', source=self.fit_data,line_color='lime',line_width=2,line_dash='dotdash',legend='VA')
+        hover_tool_6 = HoverTool(renderers=[p_6],tooltips=[( 'VA/%', '@va{0.0}' )],mode='vline')
+        self.pn.add_tools(hover_tool_6)
+        p_7=self.pn.line('a0','va2', source=self.fit_data,line_color='deeppink',line_width=2,line_dash='dotdash',legend='VA2')
+        hover_tool_7 = HoverTool(renderers=[p_7],tooltips=[( 'VA2/%', '@va2{0.0}' )],mode='vline')
+        self.pn.add_tools(hover_tool_7)
+        self.pn.plot_height = 400
+        self.pn.plot_width = 600
+        self.pn.legend.click_policy = 'hide'
+        self.pn.legend.location = 'top_right'
+        self.pn.legend.border_line_alpha = 0
+        self.pn.legend.background_fill_alpha = 0.1
+        # add callbacks
+        for i in self.sliders:
+            i.on_change('value',self.callback)
+        self.FminFmax.on_change('value',self.callback)
+        self.slider_conc_range.on_change('value',self.callback)
+        refresh_button.on_click(self.refresh_button_cb)
+        add_button.on_click(self.add_button_cb)
+        bottom= Div(text="""
+        <div style="text-align:center;">
+        <p><a href="http://www.aptitudemedical.com/index.html">Aptitude Medical Systems, Inc.</a> </p>
+        </div>
+        """,width=800,height=20)
+        self.layout =([self.p,self.pn],[para_input,para_slider,rand_opt],[bottom])
+
+    def signal_solver(self,a0,v0,ka1,ka2,kr1,kr2,kr3,c1,c2,Fmin,Fmax,**kwargs):
+        def root(a0):
+            roots=np.roots([1/ka1/ka2,(2/ka1+2*v0/ka1/ka2-a0/ka1/ka2),(1+2*v0/ka1-2*a0/ka1),-a0])
+            roots=[k.real for k in roots if k.imag==0 and 0<k.real<a0]
+            return roots[0]
+        a = np.fromiter(map(root,a0),dtype=float)
+        v=v0/(1+2*a/ka1+a**2/ka1/ka2)
+        va = 2*v*a/ka1
+        va2= va*a/2/ka2
+        r_r0=1/(1+v/kr1+va/kr2+va2/kr3)
+        signal_v= (Fmax-Fmin)*(v*r_r0/kr1) + Fmin/3
+        signal_va = (Fmax-Fmin)*(c1*va*r_r0/kr2) + Fmin/3
+        signal_va2=(Fmax-Fmin)*(c2*va2*r_r0/kr3) + Fmin/3
+        signal = signal_v+signal_va+signal_va2
+        return signal,signal_v,signal_va,signal_va2,100*v/v0,100*va/v0,100*va2/v0
+
+    def randomizer(self,signal,linear=0.001, proportional=0.001,seed=42,**kwargs):
+        np.random.seed(seed)
+        size = len(signal)
+        max_sig = max(signal)
+        return signal * np.random.normal(loc=1,scale=proportional,size=size) + max_sig*np.random.normal(loc=0,scale=linear,size=size)
+
+    def generate_plotdata(self,start=None,end=None,randomize=False,**kwargs):
+        if start == None and end == None:
+            a_0 = np.geomspace(kwargs['ka1'] / 1000, kwargs['ka1'] * 1000, 50)
+        else:
+            a_0= np.geomspace(start,end,kwargs['points'])
+        signal,signal_v,signal_va,signal_va2,v,va,va2 = self.signal_solver(a0=a_0,**kwargs)
+        if randomize:
+            signal = self.randomizer(np.repeat(signal,kwargs['sets']),**kwargs)
+            result_={'a0':np.repeat(a_0,kwargs['sets']), 'signal':signal}
+        else:
+            result_ = {'a0':a_0, 'signal':signal,'signal_v':signal_v,'signal_va':signal_va,'signal_va2':signal_va2,'v':v,'va':va,'va2':va2}
+        return result_
+
+    def fetch_para(self,randomize):
+        result={}
+        for k,i in self.slidersdict.items():
+            if k.startswith(('v','a','k')):
+                result.update({k:10**i.value})
+            elif k=='linear' or k=='proportional':
+                result.update({k:i.value/100})
+            else:result.update({k:i.value})
+
+        result.update(Fmax= self.FminFmax.value[1])
+        result.update( Fmin=self.FminFmax.value[0])
+        if randomize:
+            result.update(start = 10**self.slider_conc_range.value[0])
+            result.update(end = 10**self.slider_conc_range.value[1],randomize=True)
+
+        return result
+
+    def callback(self,attr,old,new):
+        for k,i in self.input.items():
+            i.value=str(10**self.slidersdict[k].value)
+        self.p.title.text='Receptor-VEGF RIC50 with Cooperativity'
+        self.fit_data.data = self.generate_plotdata(**self.fetch_para(False))
+        self.raw_data.data = self.generate_plotdata(**self.fetch_para(True))
+
+    def refresh_button_cb(self):
+        seed = np.random.randint(90000)
+        self.raw_data.data = self.generate_plotdata(**self.fetch_para(True),seed=seed)
+        # self.p.title.text = self.title_generator(self.fetch_para(False))
+
+    def title_generator(self,para_dict):
+        title=""
+        for k,i in para_dict.items():
+            title+="{}:{:.3g}; ".format(k,i)
+        return title
+
+    def add_button_cb(self):
+        plojo_data=plojo_data_init()
+        new_entry=plojo_data.next_exp(1)[0]
+        new_index = False
+        for key in plojo_data.index.keys():
+            if 'Simuojo' in key:
+                new_index = key
+        if not new_index:
+            new_index = plojo_data.new_index('Simuojo Data')
+        concentration=list(self.raw_data.data['a0'])
+        signal=list(self.raw_data.data['signal'])
+        name=self.name_input.value
+        para = self.fetch_para(True)
+        tags = "Simu RIC50 Coop Data"
+        notes = self.title_generator(para)
+        dict_tosave = dict(date='SimuDate',concentration=concentration,signal=signal,tag=tags,note=notes,fit_method='ic_50',author='simu',name=name)
         plojo_data.experiment[new_entry]=dict_tosave
         plojo_data.index[new_index].add(new_entry)
         plojo_data.experiment_to_save.update({new_entry:'sync'})
