@@ -7,3 +7,6 @@ with shelve.open('/Users/hui/Scripts/plojo/plojo-nior/hplc_data','rb') as f:
 
 
 print(json.dumps(data,indent=4))
+
+
+print(1)
