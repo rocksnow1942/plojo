@@ -36,7 +36,8 @@ current_time = datetime.datetime.now()
 upload_file_source = ColumnDataSource({'file_contents':[],'file_name':[]})
 
 
-file_save_location = path.join(path.dirname(__file__),'data')
+# file_save_location = path.join(path.dirname(__file__),'data')
+file_save_location = '/Users/hui/Cloudstation/R&D/Users/Hui Kang/Scripts/plojo/plojo/data' # pathname on my mac.
 
 # '/Users/hui/Documents/PycharmProjects/plojo/plojo_app'
 
