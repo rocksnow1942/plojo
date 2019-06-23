@@ -13,6 +13,7 @@ import numpy as np
 from utils import file_name,file_path,upload_data_folder,temp_position
 
 
+
 # declare globals
 global info_change_keep,data_index,info_deque_holder,current_time,temp_data_to_save,raw_data,axis_label_dict,user_pwd,copyed_runs,analysis_temp_keep
 box_select_source = ColumnDataSource(data=dict(x=[], y=[], width=[], height=[]))

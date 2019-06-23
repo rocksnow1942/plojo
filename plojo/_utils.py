@@ -1,9 +1,16 @@
 from os import path
 import platform
 
-systemname = platform.node()
+localmode=False
 
-if systemname.startswith('huis-mac-mini'):
+
+
+systemname = platform.node()
+if localmode:
+    file_save_location =  path.join(path.dirname(__file__),'data')
+    temp_position = file_save_location
+
+elif systemname.startswith('huis-mac-mini'):
     file_save_location = '/Users/hui/Cloudstation/R&D/Users/Hui Kang/Scripts/plojo/plojo/data'
     temp_position=path.join(file_save_location,'temp')
 else:
