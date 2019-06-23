@@ -13,6 +13,7 @@ import os,copy
 import glob
 import base64
 import shelve
+from _utils import file_save_location,temp_position,file_name
 
 # to start server:
 #
@@ -37,12 +38,8 @@ upload_file_source = ColumnDataSource({'file_contents':[],'file_name':[]})
 
 
 # file_save_location = path.join(path.dirname(__file__),'data')
-file_save_location = '/Users/hui/Cloudstation/R&D/Users/Hui Kang/Scripts/plojo/plojo/data' # pathname on my mac.
 
-# '/Users/hui/Documents/PycharmProjects/plojo/plojo_app'
 
-temp_position=path.join(file_save_location,'temp')
-file_name = 'plojo_data'
 
 
 # # load file write to shelve file.
@@ -753,7 +750,7 @@ botton_spacer = Div(text='', width=400, height=100)
 # <a href="https://tinyurl.com/y2nbhlu9">
 ams_logo_text="""
 <div style="text-align:right;">
-  <img src="plojo_app/static/ams_logo.jpg" alt="ams logo" height='50' width="120" onclick="alert('Nothing in here...')">
+  <img src="plojo/static/ams_logo.jpg" alt="ams logo" height='50' width="120" onclick="alert('Nothing in here...')">
 <p><a href="http://www.aptitudemedical.com/index.html">Aptitude Medical Systems, Inc.</a> </p>
 </div>
 """
@@ -1362,7 +1359,6 @@ def project_dropdown_cb(attr,old,new):
                         project_list.options = project_menu_generator()
                         project_list.value = [index_]
                         save_data()
-
     except:
         info_box.text = info_deque('Error during project_dropdown_cb.')
     project_dropdown.value='none'
