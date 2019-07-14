@@ -218,6 +218,16 @@ def fit_CI_value(func,x_fit,fit_method,fit_para_CI,fit_para):
         y_fit_upper_CI = y_fit.max(axis=0)
     return y_fit_lower_CI, y_fit_upper_CI
 
+def r_squared_calc(x_o_tofit,y_o_tofit,fit_para,fit_method):
+    """
+    give the fit method and normal scale fit_para dict, calculate r_squared.
+    """
+    func,_b,_a = fit_method_fetcher(fit_method)
+    residuals = y_o_tofit-func(x_o_tofit,**fit_para)
+    ss_residual = np.sum(residuals**2)
+    ss_total = np.sum((y_o_tofit-np.mean(y_o_tofit))**2)
+    r_squared = 1- ss_residual/ss_total
+    return r_squared
 
 def generate_cds(data,**kwargs):
     x_o = np.array(data['concentration'])

@@ -1,12 +1,22 @@
 import os
+import sys
 from os import path
 import shelve
 from bokeh.plotting import figure, ColumnDataSource
 from bokeh.models import HoverTool,Slider,RangeSlider
-from bokeh.models.widgets import Button, TextInput,PreText,Div
-from bokeh.layouts import widgetbox
+from bokeh.models.widgets import Button, TextInput,PreText,Div,TextAreaInput,Select
+from bokeh.layouts import widgetbox,column,row
 import numpy as np
-from _utils import file_save_location,file_name
+from simu_utils import file_save_location,file_name
+import datetime,time
+
+
+
+cache_loc=path.join(path.dirname(__file__),'static','cache')
+
+# currently importing from NGS package.
+sys.path.append('/Users/hui/Documents/Scripts/NGS_tools')
+from NGS import Structure
 
 class Data():
     def __init__(self,data_index):
@@ -760,9 +770,6 @@ class ric50_simu():
         plojo_data.save_experiment()
         self.p.title.text='Data Saved to plojo.'
 
-
-
-
 class ri50_coop_simu():
     def __init__(self):
         para_text = PreText(text='Binding Parameters')
@@ -951,3 +958,102 @@ class ri50_coop_simu():
         plojo_data.experiment_to_save.update({new_entry:'sync'})
         plojo_data.save_experiment()
         self.p.title.text='Data Saved to plojo.'
+
+class structure_prediction():
+
+    def __init__(self):
+        self.sequence =TextAreaInput(title="Enter Sequence:",rows=4,cols=100,max_length=5000)
+        width=150
+        self.predict = Button(label='Predict',button_type='success',width=width)
+        self.reset = Button(label='Reset',button_type='warning',width=width)
+        self.name=TextInput(title='Sequence Name',value='NewSequence',width=width)
+        self.inputa_backbone =Select(title='Backbone type:',value='rna',options=[('rna','RNA'),('dna','DNA')],width=width)
+        self.inputb_SetTemperature = TextInput(title='Set Temperature (K):',value='310.15',width=width)
+        self.inputc_percent= TextInput(title='Max % suboptimal',value='50',width=width)
+        self.inputd_window = TextInput(title='Window',value='1',width=width)
+        self.inpute_maxstr = TextInput(title='Max Structure NO',value='8',width=width)
+        self.inputf_ForceSingleStranded =TextInput(title='Force Single Strand',value='None',width=width)
+        self.inputg_ForceDoubleStranded = TextInput(title='Force Double Strand',value='None',width=width)
+        self.inputh_ForcePair = TextInput(title='Force Pair',value='None',width=width)
+        self.inputi_ForceProhibitPair = TextInput(title='Force No Pair',value='None',width=width)
+        self.inputj_ForceModification = TextInput(title='Modification Site',value='None',width=width)
+        self.inputk_ForceFMNCleavage = TextInput(title='FMC Cleavage',value='None',width=width)
+        self.default = ['rna','310.15','50','1','8']+['None']*6
+        self.parainputs = [i for k,i in sorted(self.__dict__.items(),key=lambda x:x[0]) if k.startswith('input')]
+        self.div=Div(text='',width=50)
+        self.plot = Div(text="""
+        <h2>Secondary Structure Prediction - based on <a href='https://rna.urmc.rochester.edu/RNAstructure.html'>RNAstructure package <a></h2>
+        <h3>How To Use:</h3>
+        <p>1. <b>Enter Sequence:</b> Only enter oligo sequence. Case doesn't matter. Letters other than "ATGCUatgcu" will be automatically filtered out.
+        That is, f[G]f[U]f{T}ome-t = GUTT</p>
+        <p>2. <b>Sequence Name</b> sequence name is used for plot title and figure file name.</p>
+        <p>3. <b>Backbone Type</b> select RNA or DNA. Thermodynamics paramters will be different for DNA or RNA.</p>
+        <p>4. <b></b></p>
+        <p><b></b></p>
+        <p><b></b></p>
+
+        Paste sequence and click Predict to show secondary structure.
+
+
+
+
+        """,width=800,height=800)
+
+        bottom= Div(text="""
+        <div style="text-align:center;">
+        <p><a href="http://www.aptitudemedical.com/index.html">Aptitude Medical Systems, Inc.</a> </p>
+        </div>
+        """,width=800,height=20)
+        self.layout=([self.sequence],[widgetbox(self.name,*self.parainputs),column(row(self.predict,self.div,self.reset),self.plot)],[bottom])
+        self.predict.on_click(self.predict_cb)
+        self.reset.on_click(self.reset_cb)
+
+    def reset_cb(self):
+        for i,j in zip(self.default,self.parainputs):
+            j.value=i
+        self.name.value='NewSequence'
+        self.plot.text="\n\n\n<h1>Prameters reset.</h1>"
+
+    def parsesequence(self,seq):
+        seq=''.join([i.upper() for i in seq if i in 'ATGCUatgcu'])
+        self.sequence.value=seq
+        return seq
+
+    def parsepara(self):
+        para={}
+        for k,i in filter(lambda x:x[0].startswith('input'),self.__dict__.items()):
+            key=k.split('_')[1]
+            value=i.value.strip()
+            if 'Force' in key:
+                if value == 'None' or (not value):
+                    continue
+                elif '-' in value:
+                    _v=[(int(i.split('-')[0]),int(i.split('-')[1])) for i in value.split(',')]
+                else:
+                    _v=[int(i) for i in value.split(',')]
+                para.update({key:_v})
+            elif key=='backbone':
+                para.update(backbone=value)
+            else:
+                para.update({key:float(value)})
+
+        return para
+
+
+    def predict_cb(self,):
+        try:
+            name=self.name.value
+            sequence=self.parsesequence(self.sequence.value)
+            para=self.parsepara()
+            print('+'*100)
+            print(name,"=>",sequence)
+            print(para)
+            print('+'*100+'\n')
+            rna=Structure(sequence,name,save_loc=cache_loc)
+            save=name+datetime.datetime.now().strftime("%y%m%d_%H%M%S")
+            h,w=rna.fold(**para).plot_fold(save=save)
+            self.plot.text="""
+            <img src="simuojo/static/cache/{}" alt="browse" hspace='20' align='bottom',height='800' width="800">
+            """.format(save+'.png')
+        except Exception as e:
+            self.plot.text=str(e)
