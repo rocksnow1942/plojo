@@ -41,10 +41,12 @@ def simu_sele_cb(attr,old,new):
         <img src="simuojo/static/ric_50_co.png" height='60' width="286" "><div>"""
     elif new == 'structure_prediction':
         structlayout=structure_prediction().layout
-        temp = layout([model_display,simu_sele],*structlayout)
+        structlayout[-1].append(simu_sele)
+        temp = Div(text="""<div style="text-align:center;">
+        <h3>Secondary Structure Prediction</h3><div>""",width=1000,height=10)
+        temp = layout([temp],*structlayout)
         select_layout.children = temp.children
-        model_display.text = """<div style="text-align:center;">
-        <h3>Secondary Structure Prediction</h3><div>"""
+
 
 
 

@@ -1,5 +1,5 @@
 import os
-import sys
+# import sys
 from os import path
 import shelve
 from bokeh.plotting import figure, ColumnDataSource
@@ -8,15 +8,15 @@ from bokeh.models.widgets import Button, TextInput,PreText,Div,TextAreaInput,Sel
 from bokeh.layouts import widgetbox,column,row
 import numpy as np
 from simu_utils import file_save_location,file_name
-import datetime,time
+import datetime
 
 
 
 cache_loc=path.join(path.dirname(__file__),'static','cache')
 
 # currently importing from NGS package.
-sys.path.append('/Users/hui/Documents/Scripts/NGS_tools')
-from NGS import Structure
+# sys.path.append('/Users/hui/Documents/Scripts/NGS_tools')
+from _structurepredict import Structure
 
 class Data():
     def __init__(self,data_index):
@@ -962,7 +962,7 @@ class ri50_coop_simu():
 class structure_prediction():
 
     def __init__(self):
-        self.sequence =TextAreaInput(title="Enter Sequence:",rows=4,cols=100,max_length=5000)
+        self.sequence =TextAreaInput(title="Enter Sequence:",rows=4,cols=150,max_length=5000)
         width=150
         self.predict = Button(label='Predict',button_type='success',width=width)
         self.reset = Button(label='Reset',button_type='warning',width=width)
@@ -977,27 +977,41 @@ class structure_prediction():
         self.inputh_ForcePair = TextInput(title='Force Pair',value='None',width=width)
         self.inputi_ForceProhibitPair = TextInput(title='Force No Pair',value='None',width=width)
         self.inputj_ForceModification = TextInput(title='Modification Site',value='None',width=width)
-        self.inputk_ForceFMNCleavage = TextInput(title='FMC Cleavage',value='None',width=width)
+        self.inputk_ForceFMNCleavage = TextInput(title='FMN Cleavage',value='None',width=width)
         self.default = ['rna','310.15','50','1','8']+['None']*6
         self.parainputs = [i for k,i in sorted(self.__dict__.items(),key=lambda x:x[0]) if k.startswith('input')]
         self.div=Div(text='',width=50)
-        self.plot = Div(text="""
+        self.text="""
         <h2>Secondary Structure Prediction - based on <a href='https://rna.urmc.rochester.edu/RNAstructure.html'>RNAstructure package <a></h2>
+        <p>Predicts the lowest free energy structure and suboptimal structures.</p>
         <h3>How To Use:</h3>
-        <p>1. <b>Enter Sequence:</b> Only enter oligo sequence. Case doesn't matter. Letters other than "ATGCUatgcu" will be automatically filtered out.
+        <p>1. <b>Enter Sequence</b> Only enter oligo sequence. Case doesn't matter. Letters other than "ATGCUatgcu" will be automatically filtered out.
         That is, f[G]f[U]f{T}ome-t = GUTT</p>
-        <p>2. <b>Sequence Name</b> sequence name is used for plot title and figure file name.</p>
-        <p>3. <b>Backbone Type</b> select RNA or DNA. Thermodynamics paramters will be different for DNA or RNA.</p>
-        <p>4. <b></b></p>
-        <p><b></b></p>
-        <p><b></b></p>
-
-        Paste sequence and click Predict to show secondary structure.
-
-
-
-
-        """,width=800,height=800)
+        <p>2. <b>Sequence Name</b> Sequence name is used for plot title and figure file name.</p>
+        <p>3. <b>Backbone Type</b> Select RNA or DNA. Thermodynamics paramters will be different for DNA or RNA.</p>
+        <p>4. <b>Set Temperature</b> This allows the user to specify folding temperatures other than 310.15 K (37 degrees C).  </p>
+        <p>5. <b>Max % suboptimal</b> is the maximum % difference in free energy in suboptimal structures from the lowest free energy structure. The higher the number, more suboptimal structures will be permitted. </p>
+        <p>6. <b>Window</b> is a parameter that specifies how different the suboptimal
+        structures should be from each other (0=no restriction and larger
+        integers require structures to be more different). </p>
+        <p>7. <b>Max Structure NO</b> is the maximum number of suboptimal structures to
+        generate.</p>
+        <p>8. <b>Force Single Strand</b> Force one or more nucleotide to be single stranded. format: n.t. position index separated by ",". e.g. 1,4,38 </p>
+        <p>9. <b>Force Double Strand</b> Force one or more nucleotide to be double stranded. format: same as #8.</p>
+        <p>10.<b>Force Pair</b> Force a pair between two nucleotides. format: use "-" to link paired n.t., separate multiple pairs by ",". e.g. 1-39,2-38,3-37 </p>
+        <p>11.<b>Force No Pair</b> Prohibit a pair between two nucleotides. format: same as #10.</p>
+        <p>12.<b>Modification Site</b> This paramater indicates a nucleotide that is accessible to chemical
+        modification. In subsequent structure prediction, this nucleotide will
+        be single stranded, at the end of a helix, or in or adjacent to a GU
+        pair. format: same as #8</p>
+        <p>13.<b>FMN Cleavage</b> Indicate a nucleotide that is accessible to FMN cleavage (a U in GU
+        pair) (<a href='https://pubs.acs.org/doi/10.1021/ja962918p'>Reference<a>).
+        In subsequent structure prediction, this nucleotide will be in a GU
+        pair.</p>
+        <p>Click <b>Predict</b> will use current paramters to predict secondary structures.</p>
+        <p>Click <b>Reset</b> will reset all parameters.</p>
+        """
+        self.plot = Div(text=self.text,width=800,height=800)
 
         bottom= Div(text="""
         <div style="text-align:center;">
@@ -1012,7 +1026,7 @@ class structure_prediction():
         for i,j in zip(self.default,self.parainputs):
             j.value=i
         self.name.value='NewSequence'
-        self.plot.text="\n\n\n<h1>Prameters reset.</h1>"
+        self.plot.text="<h1>Parameters reset.</h1>"+self.text
 
     def parsesequence(self,seq):
         seq=''.join([i.upper() for i in seq if i in 'ATGCUatgcu'])
@@ -1045,15 +1059,11 @@ class structure_prediction():
             name=self.name.value
             sequence=self.parsesequence(self.sequence.value)
             para=self.parsepara()
-            print('+'*100)
-            print(name,"=>",sequence)
-            print(para)
-            print('+'*100+'\n')
             rna=Structure(sequence,name,save_loc=cache_loc)
             save=name+datetime.datetime.now().strftime("%y%m%d_%H%M%S")
             h,w=rna.fold(**para).plot_fold(save=save)
             self.plot.text="""
             <img src="simuojo/static/cache/{}" alt="browse" hspace='20' align='bottom',height='800' width="800">
-            """.format(save+'.png')
+            """.format(save+'.svg')
         except Exception as e:
             self.plot.text=str(e)
