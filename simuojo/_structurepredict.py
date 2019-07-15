@@ -59,11 +59,14 @@ class Structure:
         """
         self.foldpara=kwargs.copy()
         if self.foldpara.get('SetTemperature',None):
-            self.foldpara['SetTemperature']-=273.15
+            self.foldpara['SetTemperature']+=273.15 # to convert C to K
         backbone=kwargs.pop('backbone','rna')
         self.RNA=RNA.fromString(self.seq,backbone)
         if kwargs:
             for k,i in kwargs.items():
+
+                print(k," => ", i)
+
                 if isinstance(i,(list,tuple)):
                     for j in i:
                         if isinstance(j,int):
