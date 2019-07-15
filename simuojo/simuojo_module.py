@@ -1021,6 +1021,7 @@ class structure_prediction():
         self.layout=([self.sequence],[widgetbox(self.name,*self.parainputs),column(row(self.predict,self.div,self.reset),self.plot)],[bottom])
         self.predict.on_click(self.predict_cb)
         self.reset.on_click(self.reset_cb)
+        self.status=0
 
 
     def reset_cb(self):
@@ -1065,15 +1066,18 @@ class structure_prediction():
             os.remove(file_list[0])
         return len(file_list)
 
-
     def predict_cb(self,):
         name=self.name.value
         try:
-            n=self.clear_cache()
-
-            save = name +'_'+ datetime.datetime.now().strftime("%m%d_%H%M%S")
             sequence=self.parsesequence(self.sequence.value)
             para=self.parsepara()
+            self.clear_cache()
+            ct=para.copy()
+            ct.update(sequence=sequence)
+            if ct == self.status:
+                return 0
+            self.status=ct
+            save = name +'_'+ datetime.datetime.now().strftime("%m%d_%H%M%S")
             rna=Structure(sequence,name,save_loc=cache_loc)
             h,w=rna.fold(**para).plot_fold(save=save)
             figh,figw= 800*h/(max(h,w)),800*w/(max(h,w))

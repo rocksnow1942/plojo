@@ -43,7 +43,7 @@ def simu_sele_cb(attr,old,new):
         structlayout=structure_prediction().layout
         structlayout[-1].append(simu_sele)
         temp = Div(text="""
-        <h3 align='center'>Secondary Structure Prediction</h3>""",width=800,height=30)
+        <h1 align='center'>Secondary Structure Prediction</h1>""",width=800,height=30)
         temp = layout([temp],*structlayout)
         select_layout.children = temp.children
 
