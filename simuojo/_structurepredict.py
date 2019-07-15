@@ -9,6 +9,8 @@ import matplotlib.cm as cmx
 from matplotlib.gridspec import GridSpec
 from os import path,getcwd,makedirs
 
+plotbackend='.png'
+
 class Structure:
     """
     class wrapper around RNAstruture RNA class.
@@ -56,6 +58,8 @@ class Structure:
         if no parameters passed, remove all constraints.
         """
         self.foldpara=kwargs.copy()
+        if self.foldpara.get('SetTemperature',None):
+            self.foldpara['SetTemperature']-=273.15
         backbone=kwargs.pop('backbone','rna')
         self.RNA=RNA.fromString(self.seq,backbone)
         if kwargs:
@@ -172,8 +176,8 @@ class Structure:
         ax.text(0.01,0.85,text, transform=ax.transAxes, fontsize=max(int(3*plot_size),8),verticalalignment='top',family='monospace')
         if save:
             save = save if isinstance(save,str) else '2DP_'+self.name
-            save = self.ifexist(save+'.svg')
-            plt.savefig(save)
+            save = self.ifexist(save+plotbackend)
+            plt.savefig(save,dpi=150)
         else:
             plt.show()
         return figheight,figwidth

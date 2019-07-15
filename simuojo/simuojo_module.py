@@ -1,22 +1,19 @@
-import os
-# import sys
+import os,glob
 from os import path
 import shelve
 from bokeh.plotting import figure, ColumnDataSource
 from bokeh.models import HoverTool,Slider,RangeSlider
 from bokeh.models.widgets import Button, TextInput,PreText,Div,TextAreaInput,Select
-from bokeh.layouts import widgetbox,column,row
+from bokeh.layouts import widgetbox,column,row,layout
 import numpy as np
 from simu_utils import file_save_location,file_name
-import datetime
-
-
+from _structurepredict import Structure,plotbackend
+import datetime,time
+import hashlib
 
 cache_loc=path.join(path.dirname(__file__),'static','cache')
 
-# currently importing from NGS package.
-# sys.path.append('/Users/hui/Documents/Scripts/NGS_tools')
-from _structurepredict import Structure
+global register
 
 class Data():
     def __init__(self,data_index):
@@ -774,6 +771,7 @@ class ri50_coop_simu():
     def __init__(self):
         para_text = PreText(text='Binding Parameters')
         para_text_ = PreText(text='Binding Parameters')
+        self.pretext=para_text
         self.v0 = Slider(title='VEGF concentration (nM)', start=-3, end=3, step=0.01, value=0)
         self.ka1 = Slider(title='Aptamer+VEGF  Kd1 (nM)', start=-3, end=3, step=0.01, value=0)
         self.ka2 = Slider(title='Aptamer+VEGF  Kd2 (nM)', start=-3, end=3, step=0.01, value=0)
@@ -856,7 +854,10 @@ class ri50_coop_simu():
         # add callbacks
         for i in self.sliders:
             i.on_change('value',self.callback)
+
         self.FminFmax.on_change('value',self.callback)
+        # self.FminFmax.on_change('value',self.test_cb)
+
         self.slider_conc_range.on_change('value',self.callback)
         refresh_button.on_click(self.refresh_button_cb)
         add_button.on_click(self.add_button_cb)
@@ -866,6 +867,8 @@ class ri50_coop_simu():
         </div>
         """,width=800,height=20)
         self.layout =([self.p,self.pn],[para_input,para_slider,rand_opt],[bottom])
+
+
 
     def signal_solver(self,a0,v0,ka1,ka2,kr1,kr2,kr3,c1,c2,Fmin,Fmax,**kwargs):
         def root(a0):
@@ -962,13 +965,13 @@ class ri50_coop_simu():
 class structure_prediction():
 
     def __init__(self):
-        self.sequence =TextAreaInput(title="Enter Sequence:",rows=4,cols=150,max_length=5000)
+        self.sequence =TextAreaInput(title="Enter Sequence:",rows=4,cols=150,max_length=5000,width=1000)
         width=150
         self.predict = Button(label='Predict',button_type='success',width=width)
         self.reset = Button(label='Reset',button_type='warning',width=width)
         self.name=TextInput(title='Sequence Name',value='NewSequence',width=width)
         self.inputa_backbone =Select(title='Backbone type:',value='rna',options=[('rna','RNA'),('dna','DNA')],width=width)
-        self.inputb_SetTemperature = TextInput(title='Set Temperature (K):',value='310.15',width=width)
+        self.inputb_SetTemperature = TextInput(title='Set Temperature (C):',value='37',width=width)
         self.inputc_percent= TextInput(title='Max % suboptimal',value='50',width=width)
         self.inputd_window = TextInput(title='Window',value='1',width=width)
         self.inpute_maxstr = TextInput(title='Max Structure NO',value='8',width=width)
@@ -978,7 +981,7 @@ class structure_prediction():
         self.inputi_ForceProhibitPair = TextInput(title='Force No Pair',value='None',width=width)
         self.inputj_ForceModification = TextInput(title='Modification Site',value='None',width=width)
         self.inputk_ForceFMNCleavage = TextInput(title='FMN Cleavage',value='None',width=width)
-        self.default = ['rna','310.15','50','1','8']+['None']*6
+        self.default = ['rna','37','50','1','8']+['None']*6
         self.parainputs = [i for k,i in sorted(self.__dict__.items(),key=lambda x:x[0]) if k.startswith('input')]
         self.div=Div(text='',width=50)
         self.text="""
@@ -989,7 +992,7 @@ class structure_prediction():
         That is, f[G]f[U]f{T}ome-t = GUTT</p>
         <p>2. <b>Sequence Name</b> Sequence name is used for plot title and figure file name.</p>
         <p>3. <b>Backbone Type</b> Select RNA or DNA. Thermodynamics paramters will be different for DNA or RNA.</p>
-        <p>4. <b>Set Temperature</b> This allows the user to specify folding temperatures other than 310.15 K (37 degrees C).  </p>
+        <p>4. <b>Set Temperature</b> This allows the user to specify folding temperatures other than 37deg C.  </p>
         <p>5. <b>Max % suboptimal</b> is the maximum % difference in free energy in suboptimal structures from the lowest free energy structure. The higher the number, more suboptimal structures will be permitted. </p>
         <p>6. <b>Window</b> is a parameter that specifies how different the suboptimal
         structures should be from each other (0=no restriction and larger
@@ -1011,22 +1014,22 @@ class structure_prediction():
         <p>Click <b>Predict</b> will use current paramters to predict secondary structures.</p>
         <p>Click <b>Reset</b> will reset all parameters.</p>
         """
-        self.plot = Div(text=self.text,width=800,height=800)
-
+        self.plot = Div(text=self.text,width=800,height=900)
         bottom= Div(text="""
-        <div style="text-align:center;">
-        <p><a href="http://www.aptitudemedical.com/index.html">Aptitude Medical Systems, Inc.</a> </p>
-        </div>
-        """,width=800,height=20)
+        <p align='center'><a href='http://www.aptitudemedical.com'>Aptitude Medical Systems, Inc.<a></p>
+        """,width=800,height=50)
         self.layout=([self.sequence],[widgetbox(self.name,*self.parainputs),column(row(self.predict,self.div,self.reset),self.plot)],[bottom])
         self.predict.on_click(self.predict_cb)
         self.reset.on_click(self.reset_cb)
+
 
     def reset_cb(self):
         for i,j in zip(self.default,self.parainputs):
             j.value=i
         self.name.value='NewSequence'
         self.plot.text="<h1>Parameters reset.</h1>"+self.text
+        self.predict.disabled=False
+        self.predict.button_type='success'
 
     def parsesequence(self,seq):
         seq=''.join([i.upper() for i in seq if i in 'ATGCUatgcu'])
@@ -1048,22 +1051,34 @@ class structure_prediction():
                 para.update({key:_v})
             elif key=='backbone':
                 para.update(backbone=value)
+            elif key=='SetTemperature':
+                para.update({key:float(value)+273.15})
             else:
                 para.update({key:float(value)})
 
         return para
 
+    def clear_cache(self):
+        file_list = sorted(glob.glob(path.join(cache_loc,'*'+plotbackend)),key=lambda x: path.getmtime(x))
+
+        if len(file_list)>5:
+            os.remove(file_list[0])
+        return len(file_list)
+
 
     def predict_cb(self,):
+        name=self.name.value
         try:
-            name=self.name.value
+            n=self.clear_cache()
+
+            save = name +'_'+ datetime.datetime.now().strftime("%m%d_%H%M%S")
             sequence=self.parsesequence(self.sequence.value)
             para=self.parsepara()
             rna=Structure(sequence,name,save_loc=cache_loc)
-            save=name+datetime.datetime.now().strftime("%y%m%d_%H%M%S")
             h,w=rna.fold(**para).plot_fold(save=save)
+            figh,figw= 800*h/(max(h,w)),800*w/(max(h,w))
             self.plot.text="""
-            <img src="simuojo/static/cache/{}" alt="browse" hspace='20' align='bottom',height='800' width="800">
-            """.format(save+'.svg')
+            <img src="simuojo/static/cache/{}"  hspace='20' height='{:.0f}' width='{:.0f}'>
+            """.format(save+plotbackend,figh,figw)
         except Exception as e:
             self.plot.text=str(e)
