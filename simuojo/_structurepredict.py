@@ -59,7 +59,7 @@ class Structure:
         """
         self.foldpara=kwargs.copy()
         if self.foldpara.get('SetTemperature',None):
-            self.foldpara['SetTemperature']+=273.15 # to convert C to K
+            self.foldpara['SetTemperature']-=273.15 # to convert K to C in self. foldpara storage.
         backbone=kwargs.pop('backbone','rna')
         self.RNA=RNA.fromString(self.seq,backbone)
         if kwargs:
