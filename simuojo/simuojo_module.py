@@ -1073,7 +1073,7 @@ class structure_prediction():
             para=self.parsepara()
             self.clear_cache()
             ct=para.copy()
-            ct.update(sequence=sequence)
+            ct.update(sequence=sequence,name=name)
             if ct == self.status:
                 return 0
             self.status=ct
