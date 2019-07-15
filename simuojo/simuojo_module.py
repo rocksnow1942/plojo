@@ -964,7 +964,7 @@ class ri50_coop_simu():
 class structure_prediction():
 
     def __init__(self):
-        self.sequence =TextAreaInput(title="Enter Sequence:",rows=4,cols=150,max_length=5000,width=1000)
+        self.sequence =TextAreaInput(title="Enter Sequence:",rows=5,cols=145,max_length=5000,width=1000)
         width=150
         self.predict = Button(label=chr(9193)+'Predict'+chr(127922),button_type='success',width=width)
         self.reset = Button(label=chr(128260)+'Reset'+chr(127859),button_type='warning',width=width)

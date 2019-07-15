@@ -64,19 +64,17 @@ def simu_sele_cb(attr,old,new):
         <style>
         h1 {
           position: relative;
-          animation: mymove 1s;
-          animation-iteration-count: 10
+          animation: mymove 2s;
+          animation-iteration-count: infinite;
         }
 
         @keyframes mymove {
-        0%   {background: #0000FF; }
-        25%   {background: red; }
-        50%  {background: #FFFF00;}
-        75%  {background: #31B404;}
-        100% {background: #FF00BF;}
+        0%  { border:4px outset #81F7F3;             }
+        50%  { border:4px outset #ff66ff;        }
+        100%  { border:4px outset #81F7F3;      }
         }
         </style>
-        <h1 style="border: 1px solid black;text-align:center;font-family:cursive;font-size:250%;color:#FF00BF;background-color:#81F7F3"">
+        <h1 style="width:1050px;height:50px;border: 4px outset #81F7F3;text-align:center;font-family:cursive;font-size:230%;color:#FF00BF;background-color:#81F7F3"">
        &#128540
        <span style="color:#0000FF">F</span>
        <span style="color:red">O</span>
