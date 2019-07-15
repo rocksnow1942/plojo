@@ -39,15 +39,57 @@ def simu_sele_cb(attr,old,new):
         select_layout.children = temp.children
         model_display.text = """<div style="text-align:center;">
         <img src="simuojo/static/ric_50_co.png" height='60' width="286" "><div>"""
+
+    # elif new == 'structure_prediction':
+    #     structlayout=structure_prediction().layout
+    #     structlayout[-1].append(simu_sele)
+    #     temp = Div(text="""
+    #     <h1 style="border: 1px solid black;text-align:center;font-family:cursive;font-size:250%;color:#FF00BF;background-color:#81F7F3"">
+    #     &#128540
+    #     <span style="color:#0000FF">F</span>
+    #     <span style="color:red">O</span>
+    #     <span style="color:#FFFF00">L</span>
+    #     <span style="color:#31B404">D</span>
+    #     <span style="color:#FF00BF">ojo </span>
+    #     &#129322
+    #     </h1>""",width=1000,height=30)
+    #     temp = layout([temp],*structlayout)
+    #     select_layout.children = temp.children
+
+
     elif new == 'structure_prediction':
         structlayout=structure_prediction().layout
         structlayout[-1].append(simu_sele)
         temp = Div(text="""
-        <h1 align='center'>Secondary Structure Prediction</h1>""",width=800,height=30)
+        <style>
+        h1 {
+          position: relative;
+          animation: mymove 1s;
+          animation-iteration-count: 10
+        }
+
+        @keyframes mymove {
+        0%   {background: #0000FF; }
+        25%   {background: red; }
+        50%  {background: #FFFF00;}
+        75%  {background: #31B404;}
+        100% {background: #FF00BF;}
+        }
+        </style>
+        <h1 style="border: 1px solid black;text-align:center;font-family:cursive;font-size:250%;color:#FF00BF;background-color:#81F7F3"">
+       &#128540
+       <span style="color:#0000FF">F</span>
+       <span style="color:red">O</span>
+       <span style="color:#FFFF00">L</span>
+       <span style="color:#31B404">D</span>
+       <span style="color:#FF00BF">ojo </span>
+       &#129322
+       </h1>
+        """,width=1000,height=40)
         temp = layout([temp],*structlayout)
         select_layout.children = temp.children
 
-
+#<span style="color:#FF00BF"></span>
 
 simu_sele.on_change('value',simu_sele_cb)
 select_layout=layout([row(model_display,simu_sele)])

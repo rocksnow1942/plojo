@@ -4,12 +4,11 @@ import shelve
 from bokeh.plotting import figure, ColumnDataSource
 from bokeh.models import HoverTool,Slider,RangeSlider
 from bokeh.models.widgets import Button, TextInput,PreText,Div,TextAreaInput,Select
-from bokeh.layouts import widgetbox,column,row,layout
+from bokeh.layouts import widgetbox,column,row
 import numpy as np
 from simu_utils import file_save_location,file_name
 from _structurepredict import Structure,plotbackend
-import datetime,time
-import hashlib
+import datetime
 
 cache_loc=path.join(path.dirname(__file__),'static','cache')
 
@@ -967,8 +966,8 @@ class structure_prediction():
     def __init__(self):
         self.sequence =TextAreaInput(title="Enter Sequence:",rows=4,cols=150,max_length=5000,width=1000)
         width=150
-        self.predict = Button(label='Predict',button_type='success',width=width)
-        self.reset = Button(label='Reset',button_type='warning',width=width)
+        self.predict = Button(label=chr(9193)+'Predict'+chr(127922),button_type='success',width=width)
+        self.reset = Button(label=chr(128260)+'Reset'+chr(127859),button_type='warning',width=width)
         self.name=TextInput(title='Sequence Name',value='NewSequence',width=width)
         self.inputa_backbone =Select(title='Backbone type:',value='rna',options=[('rna','RNA'),('dna','DNA')],width=width)
         self.inputb_SetTemperature = TextInput(title='Set Temperature (C):',value='37',width=width)
@@ -1028,7 +1027,7 @@ class structure_prediction():
         for i,j in zip(self.default,self.parainputs):
             j.value=i
         self.name.value='NewSequence'
-        self.plot.text="<h1>Parameters reset.</h1>"+self.text
+        self.plot.text="<h2>Parameters reset.</h2>"+self.text
         self.predict.disabled=False
         self.predict.button_type='success'
 
