@@ -184,7 +184,7 @@ class IntPair(_object):
         return 2
     def __repr__(self):
         return str((self.first, self.second))
-    def __getitem__(self, index):
+    def __getitem__(self, index): 
         if not (index % 2):
             return self.first
         else:
@@ -550,7 +550,7 @@ class Thermodynamics(_object):
     methods for changing folding temperatures This class is intended for
     use in inheritance for classes that provide functionality.
 
-    C++ includes: thermodynamics.h
+    C++ includes: thermodynamics.h 
     """
 
     __swig_setmethods__ = {}
@@ -589,7 +589,7 @@ class Thermodynamics(_object):
         prediction method if a temperature other than the 310.15 K default is
         desired. The function returns an error code where 0 is no error and
         non-zero errors can be parsed by by GetErrorMessage() or
-        GetErrorMessageString() in an inheriting class.
+        GetErrorMessageString() in an inheriting class. 
         """
         return _RNAstructure_wrap.Thermodynamics_SetTemperature(self, temperature)
 
@@ -604,7 +604,7 @@ class Thermodynamics(_object):
         Returns:
         --------
 
-        A double that indicates the folding temperature in K.
+        A double that indicates the folding temperature in K. 
         """
         return _RNAstructure_wrap.Thermodynamics_GetTemperature(self)
 
@@ -638,7 +638,7 @@ class Thermodynamics(_object):
 
         pathname:  is a pointer to cstring that indicates the pathname to the
         thermodynamnic parameters. By default, this is NULL and the
-        environment variable $DATAPATH is consulted to get this path.
+        environment variable $DATAPATH is consulted to get this path. 
         """
         return _RNAstructure_wrap.Thermodynamics_ReadThermodynamic(self, directory, alphabet, temperature)
 
@@ -661,7 +661,7 @@ class Thermodynamics(_object):
         Returns:
         --------
 
-        A pointer to datatable with free energy change parameters.
+        A pointer to datatable with free energy change parameters. 
         """
         return _RNAstructure_wrap.Thermodynamics_GetDatatable(self)
 
@@ -679,7 +679,7 @@ class Thermodynamics(_object):
         Returns:
         --------
 
-        A pointer to datatable with the enthalpy change parameters.
+        A pointer to datatable with the enthalpy change parameters. 
         """
         return _RNAstructure_wrap.Thermodynamics_GetEnthalpyTable(self, alphabet)
 
@@ -702,7 +702,7 @@ class Thermodynamics(_object):
         --------
 
         A bool yjay indicates whether the parameters are populated (true =
-        yes).
+        yes). 
         """
         return _RNAstructure_wrap.Thermodynamics_GetEnergyRead(self)
 
@@ -733,7 +733,7 @@ class RNA(Thermodynamics):
     The RNA class provides an entry point for all the single sequence
     operations of RNAstructure.
 
-    C++ includes: RNA.h
+    C++ includes: RNA.h 
     """
 
     __swig_setmethods__ = {}
@@ -758,7 +758,7 @@ class RNA(Thermodynamics):
         -----------
 
         IsRNA:  is a bool that indicates whether this sequence is RNA or DNA.
-        true= RNA. false=DNA. Default is true.
+        true= RNA. false=DNA. Default is true. 
         """
         this = _RNAstructure_wrap.new_RNA(*args)
         try:
@@ -781,7 +781,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        An integer that provides the error code.
+        An integer that provides the error code. 
         """
         return _RNAstructure_wrap.RNA_GetErrorCode(self)
 
@@ -818,7 +818,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        A pointer to a c string that provides an error message.
+        A pointer to a c string that provides an error message. 
         """
         return _RNAstructure_wrap.RNA_GetErrorMessage(error)
 
@@ -857,7 +857,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        A string that provides an error message.
+        A string that provides an error message. 
         """
         return _RNAstructure_wrap.RNA_GetErrorMessageString(self, error)
 
@@ -899,7 +899,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates an error code that can be parsed by
-        GetErrorMessage() or GetErrorMessageString(), 0 = no error.
+        GetErrorMessage() or GetErrorMessageString(), 0 = no error. 
         """
         return _RNAstructure_wrap.RNA_SpecifyPair(self, i, j, structurenumber)
 
@@ -924,7 +924,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates an error code that can be parsed by
-        GetErrorMessage() or GetErrorMessageString(), 0 = no error.
+        GetErrorMessage() or GetErrorMessageString(), 0 = no error. 
         """
         return _RNAstructure_wrap.RNA_RemovePairs(self, structurenumber, removeIfLastStructure)
 
@@ -952,7 +952,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates an error code that can be parsed by
-        GetErrorMessage() or GetErrorMessageString(), 0 = no error.
+        GetErrorMessage() or GetErrorMessageString(), 0 = no error. 
         """
         return _RNAstructure_wrap.RNA_RemoveBasePair(self, i, structurenumber)
 
@@ -994,7 +994,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        A double which is the folding free energy change in kcal/mol.
+        A double which is the folding free energy change in kcal/mol. 
         """
         return _RNAstructure_wrap.RNA_CalculateFreeEnergy(self, structurenumber, UseSimpleMBLoopRules)
 
@@ -1031,7 +1031,7 @@ class RNA(Thermodynamics):
         --------
 
         An int that indicates whether an error occurred (0 = no error; 5 =
-        error reading parameter files).
+        error reading parameter files). 
         """
         return _RNAstructure_wrap.RNA_WriteThermodynamicDetails(self, filename, UseSimpleMBLoopRules)
 
@@ -1086,7 +1086,7 @@ class RNA(Thermodynamics):
         --------
 
         An int that indicates an error code (0 = no error, 5 = error reading
-        thermodynamic parameter files, 14 = traceback error).
+        thermodynamic parameter files, 14 = traceback error). 
         """
         return _RNAstructure_wrap.RNA_FoldSingleStrand(self, *args, **kwargs)
 
@@ -1216,7 +1216,7 @@ class RNA(Thermodynamics):
         --------
 
         An int that indicates an error code (0 = no error, 5 = error reading
-        thermodynamic parameter files).
+        thermodynamic parameter files). 
         """
         return _RNAstructure_wrap.RNA_PartitionFunction(self, *args, **kwargs)
 
@@ -1360,7 +1360,7 @@ class RNA(Thermodynamics):
         --------
 
         An int that indicates an error code (0 = no error, 5 = error reading
-        thermodynamic parameter files, 14 = traceback error).
+        thermodynamic parameter files, 14 = traceback error). 
         """
         return _RNAstructure_wrap.RNA_ReFoldSingleStrand(self, percent, maximumstructures, window)
 
@@ -1419,7 +1419,7 @@ class RNA(Thermodynamics):
 
         An integer that indicates an error code (0 = no error, 4 = nucleotide
         out of range, 8 = too many restraints specified, 9 = same nucleotide
-        in conflicting restraint).
+        in conflicting restraint). 
         """
         return _RNAstructure_wrap.RNA_ForceDoubleStranded(self, i)
 
@@ -1446,7 +1446,7 @@ class RNA(Thermodynamics):
 
         An integer that indicates an error code (0 = no error, 4 = nucleotide
         out of range, 8 = too many restraints specified, 9 = same nucleotide
-        in conflicting restraint, 11 = nucleotide not U).
+        in conflicting restraint, 11 = nucleotide not U). 
         """
         return _RNAstructure_wrap.RNA_ForceFMNCleavage(self, i)
 
@@ -1472,7 +1472,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates an error code (0 = no error, 12 = too
-        short).
+        short). 
         """
         return _RNAstructure_wrap.RNA_ForceMaximumPairingDistance(self, distance)
 
@@ -1500,7 +1500,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates an error code (0 = no error, 4 = nucleotide
-        out of range, 8 = too many restraints specified).
+        out of range, 8 = too many restraints specified). 
         """
         return _RNAstructure_wrap.RNA_ForceModification(self, i)
 
@@ -1531,7 +1531,7 @@ class RNA(Thermodynamics):
         An integer that indicates an error code (0 = no error, 4 = nucleotide
         out of range, 6 = pseudoknot formation, 7 = non-canonical pair, 8 =
         too many restraints specified, 9 = same nucleotide in conflicting
-        restraint).
+        restraint). 
         """
         return _RNAstructure_wrap.RNA_ForcePair(self, i, j)
 
@@ -1560,7 +1560,7 @@ class RNA(Thermodynamics):
 
         An integer that indicates an error code (0 = no error, 4 = nucleotide
         out of range, 8 = too many restraints specified, 9 = nucleotide in
-        conflicting restraint).
+        conflicting restraint). 
         """
         return _RNAstructure_wrap.RNA_ForceProhibitPair(self, i, j)
 
@@ -1588,7 +1588,7 @@ class RNA(Thermodynamics):
 
         An integer that indicates an error code (0 = no error, 4 = nucleotide
         out of range, 8 = too many restraints specified, 9 = same nucleotide
-        in conflicting restraint).
+        in conflicting restraint). 
         """
         return _RNAstructure_wrap.RNA_ForceSingleStranded(self, i)
 
@@ -1613,7 +1613,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that is the nucleotide index. If the constraintnumber is
-        for a constraint that does not exist, zero is returned.
+        for a constraint that does not exist, zero is returned. 
         """
         return _RNAstructure_wrap.RNA_GetForcedDoubleStranded(self, constraintnumber)
 
@@ -1638,7 +1638,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that is the nucleotide index. If the constraintnumber is
-        for a constraint that does not exist, zero is returned.
+        for a constraint that does not exist, zero is returned. 
         """
         return _RNAstructure_wrap.RNA_GetForcedFMNCleavage(self, constraintnumber)
 
@@ -1663,7 +1663,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that is the nucleotide index. If the constraintnumber is
-        for a constraint that does not exist, zero is returned.
+        for a constraint that does not exist, zero is returned. 
         """
         return _RNAstructure_wrap.RNA_GetForcedModification(self, constraintnumber)
 
@@ -1692,7 +1692,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that is the nucleotide index. If the constraintnumber is
-        for a constraint that does not exist, zero is returned.
+        for a constraint that does not exist, zero is returned. 
         """
         return _RNAstructure_wrap.RNA_GetForcedPair(self, constraintnumber, fiveprime)
 
@@ -1722,7 +1722,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that is the nucleotide index. If the constraintnumber is
-        for a constraint that does not exist, zero is returned.
+        for a constraint that does not exist, zero is returned. 
         """
         return _RNAstructure_wrap.RNA_GetForcedProhibitedPair(self, constraintnumber, fiveprime)
 
@@ -1747,7 +1747,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that is the nucleotide index. If the constraintnumber is
-        for a constraint that does not exist, zero is returned.
+        for a constraint that does not exist, zero is returned. 
         """
         return _RNAstructure_wrap.RNA_GetForcedSingleStranded(self, constraintnumber)
 
@@ -1761,7 +1761,7 @@ class RNA(Thermodynamics):
 
         return An integer that indicates the maximum distance allowed between
         paired nucleotides, where -1 indicates that the maximum distance is
-        not set.
+        not set. 
         """
         return _RNAstructure_wrap.RNA_GetMaximumPairingDistance(self)
 
@@ -1777,7 +1777,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates the number of nucleotides that are forced
-        pair.
+        pair. 
         """
         return _RNAstructure_wrap.RNA_GetNumberOfForcedDoubleStranded(self)
 
@@ -1793,7 +1793,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates the number of FMN cleavage nucleotides (Us
-        in GU pairs).
+        in GU pairs). 
         """
         return _RNAstructure_wrap.RNA_GetNumberOfForcedFMNCleavages(self)
 
@@ -1808,7 +1808,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        An integer that indicates the number of modified nucleotides.
+        An integer that indicates the number of modified nucleotides. 
         """
         return _RNAstructure_wrap.RNA_GetNumberOfForcedModifications(self)
 
@@ -1823,7 +1823,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        An integer that indicates the number of forced pairs.
+        An integer that indicates the number of forced pairs. 
         """
         return _RNAstructure_wrap.RNA_GetNumberOfForcedPairs(self)
 
@@ -1838,7 +1838,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        An integer that indicates the number of pairs that are prohibited.
+        An integer that indicates the number of pairs that are prohibited. 
         """
         return _RNAstructure_wrap.RNA_GetNumberOfForcedProhibitedPairs(self)
 
@@ -1854,7 +1854,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates the number of nucleotides not allowed to
-        pair.
+        pair. 
         """
         return _RNAstructure_wrap.RNA_GetNumberOfForcedSingleStranded(self)
 
@@ -1882,7 +1882,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates an error code (0 = no error, 1 = file not
-        found, 13 = error reading constraint file).
+        found, 13 = error reading constraint file). 
         """
         return _RNAstructure_wrap.RNA_ReadConstraints(self, filename)
 
@@ -1925,7 +1925,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates an error code (0 = no error, 1 = input file
-        not found).
+        not found). 
         """
         return _RNAstructure_wrap.RNA_ReadSHAPE(self, *args)
 
@@ -1957,7 +1957,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates an error code (0 = no error, 1 = input file
-        not found).
+        not found). 
         """
         return _RNAstructure_wrap.RNA_ReadDSO(self, filename)
 
@@ -1986,7 +1986,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates an error code (0 = no error, 1 = input file
-        not found).
+        not found). 
         """
         return _RNAstructure_wrap.RNA_ReadSSO(self, filename)
 
@@ -2020,7 +2020,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates an error code (0 = no error, 1 = input file
-        not found).
+        not found). 
         """
         return _RNAstructure_wrap.RNA_ReadExperimentalPairBonus(self, filename, experimentalOffset, experimentalScaling)
 
@@ -2034,7 +2034,7 @@ class RNA(Thermodynamics):
 
         This function strips all previously assigned folding constraints. Note
         that this function does not delete SHAPE constraints or pseudo free
-        energies.
+        energies. 
         """
         return _RNAstructure_wrap.RNA_RemoveConstraints(self)
 
@@ -2066,7 +2066,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that indicates an error code (0 = no error, >0 indicates an
-        error).
+        error). 
         """
         return _RNAstructure_wrap.RNA_SetExtrinsic(self, i, j, k)
 
@@ -2091,7 +2091,7 @@ class RNA(Thermodynamics):
 
         An integer that indicates an error code (0 = no error). Currently,
         this function does not generate errors, but the return is provided to
-        add error handling in the future.
+        add error handling in the future. 
         """
         return _RNAstructure_wrap.RNA_WriteConstraints(self, filename)
 
@@ -2124,7 +2124,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that contains an error code, where 0 is no error and non-
-        zero is an error.
+        zero is an error. 
         """
         return _RNAstructure_wrap.RNA_AddComment(self, comment, structurenumber)
 
@@ -2154,7 +2154,7 @@ class RNA(Thermodynamics):
         --------
 
         An integer that provides an error code. 0 = no error, 10 = no
-        structure to write.
+        structure to write. 
         """
         return _RNAstructure_wrap.RNA_WriteCt(self, *args, **kwargs)
 
@@ -2178,7 +2178,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        An integer that provides an error code. 0 = no error.
+        An integer that provides an error code. 0 = no error. 
         """
         return _RNAstructure_wrap.RNA_WriteDotBracket(self, *args, **kwargs)
 
@@ -2220,7 +2220,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        an int that provides an error code. 0 = no error.
+        an int that provides an error code. 0 = no error. 
         """
         return _RNAstructure_wrap.RNA_BreakPseudoknot(self, minimum_energy, structurenumber, useFastMethod)
 
@@ -2248,7 +2248,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        A bool that indicates whether there is a pseudoknot.
+        A bool that indicates whether there is a pseudoknot. 
         """
         return _RNAstructure_wrap.RNA_ContainsPseudoknot(self, structurenumber)
 
@@ -2307,7 +2307,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        A double that is the folding free energy change in kcal/mol.
+        A double that is the folding free energy change in kcal/mol. 
         """
         return _RNAstructure_wrap.RNA_GetFreeEnergy(self, structurenumber)
 
@@ -2338,7 +2338,7 @@ class RNA(Thermodynamics):
         --------
 
         An int that indicates the other nucleotide in pair, where 0 is no
-        paired.
+        paired. 
         """
         return _RNAstructure_wrap.RNA_GetPair(self, i, structurenumber)
 
@@ -2360,7 +2360,7 @@ class RNA(Thermodynamics):
         = error. The errorcode can be resolved to a c string using
         GetErrorMessage. param i and j are ints that provide indexes the 5'
         and 3' nucleotides, respectively, in a pair. return A double that is
-        the folding free energy change in kcal/mol.
+        the folding free energy change in kcal/mol. 
         """
         return _RNAstructure_wrap.RNA_GetPairEnergy(self, i, j)
 
@@ -2391,7 +2391,7 @@ class RNA(Thermodynamics):
         --------
 
         A double that is the base pair probability. If i and j cannot pair,
-        0.0 is returned. If an error occurs, 0.0 is returned.
+        0.0 is returned. If an error occurs, 0.0 is returned. 
         """
         return _RNAstructure_wrap.RNA_GetPairProbability(self, i, j)
 
@@ -2409,7 +2409,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        An integer specify the total number of structures.
+        An integer specify the total number of structures. 
         """
         return _RNAstructure_wrap.RNA_GetStructureNumber(self)
 
@@ -2449,7 +2449,7 @@ class RNA(Thermodynamics):
         --------
 
         An int that provides an error code, 0 = no error and other errors can
-        be resolved to a c string using GetErrorMessage.
+        be resolved to a c string using GetErrorMessage. 
         """
         return _RNAstructure_wrap.RNA_DetermineDrawingCoordinates(self, height, width, structurenumber)
 
@@ -2476,7 +2476,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        A string that provides the comment.
+        A string that provides the comment. 
         """
         return _RNAstructure_wrap.RNA_GetCommentString(self, structurenumber)
 
@@ -2505,7 +2505,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        An int that gives the X coordinate.
+        An int that gives the X coordinate. 
         """
         return _RNAstructure_wrap.RNA_GetNucleotideXCoordinate(self, i)
 
@@ -2534,7 +2534,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        An int that gives the Y coordinate.
+        An int that gives the Y coordinate. 
         """
         return _RNAstructure_wrap.RNA_GetNucleotideYCoordinate(self, i)
 
@@ -2567,7 +2567,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        An int that gives the X coordinate.
+        An int that gives the X coordinate. 
         """
         return _RNAstructure_wrap.RNA_GetLabelXCoordinate(self, i)
 
@@ -2600,7 +2600,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        An int that gives the Y coordinate.
+        An int that gives the Y coordinate. 
         """
         return _RNAstructure_wrap.RNA_GetLabelYCoordinate(self, i)
 
@@ -2616,7 +2616,7 @@ class RNA(Thermodynamics):
         error. The errorcode can be resolved to a c string using
         GetErrorMessage. Note that nucleotides are numbered starting at an
         index of 1. return The char representing the nucleotide at index i or
-        '-' if an error occured.
+        '-' if an error occured. 
         """
         return _RNAstructure_wrap.RNA_GetNucleotide(self, i)
 
@@ -2631,7 +2631,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        An integer that specifies the total length of the sequence.
+        An integer that specifies the total length of the sequence. 
         """
         return _RNAstructure_wrap.RNA_GetSequenceLength(self)
 
@@ -2652,7 +2652,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        A bool that indicates the backbone (true = RNA, false = DNA).
+        A bool that indicates the backbone (true = RNA, false = DNA). 
         """
         return _RNAstructure_wrap.RNA_GetBackboneType(self)
 
@@ -2670,7 +2670,7 @@ class RNA(Thermodynamics):
         Returns:
         --------
 
-        A pointer to structure.
+        A pointer to structure. 
         """
         return _RNAstructure_wrap.RNA_GetStructure(self)
 
@@ -2687,7 +2687,7 @@ class RNA(Thermodynamics):
         Parameters:
         -----------
 
-        Progress:  is a TProgressDialog class.
+        Progress:  is a TProgressDialog class. 
         """
         return _RNAstructure_wrap.RNA_SetProgress(self, Progress)
 
@@ -2699,7 +2699,7 @@ class RNA(Thermodynamics):
         Provide a means to stop using a TProgressDialog. StopProgress tells
         the RNA class to no longer follow progress. This should be called if
         the TProgressDialog is deleted, so that this class does not make
-        reference to it.
+        reference to it. 
         """
         return _RNAstructure_wrap.RNA_StopProgress(self)
 
@@ -2710,7 +2710,7 @@ class RNA(Thermodynamics):
         RNA::GetProgress()
 
         Return the current pointer to TProgressDialog. This is used during
-        inheritance to provide access to the underlying TProgressDialog.
+        inheritance to provide access to the underlying TProgressDialog. 
         """
         return _RNAstructure_wrap.RNA_GetProgress(self)
 
@@ -2754,7 +2754,7 @@ def RNA_GetErrorMessage(error):
     Returns:
     --------
 
-    A pointer to a c string that provides an error message.
+    A pointer to a c string that provides an error message. 
     """
     return _RNAstructure_wrap.RNA_GetErrorMessage(error)
 
@@ -2769,7 +2769,7 @@ class HybridRNA(RNA):
     from the RNA class and contains an instance of TwoRNA, which itself
     contains two instances to the class RNA.
 
-    C++ includes: HybridRNA.h
+    C++ includes: HybridRNA.h 
     """
 
     __swig_setmethods__ = {}
@@ -2785,7 +2785,7 @@ class HybridRNA(RNA):
     def __init__(self, *args):
         """
         HybridRNA::HybridRNA(const char filename1[], const int type1, const
-        char filename2[], const int type2, const bool IsRNA=true)
+        char filename2[], const int type2, const bool IsRNA=true) 
         """
         this = _RNAstructure_wrap.new_HybridRNA(*args)
         try:
@@ -2836,7 +2836,7 @@ class HybridRNA(RNA):
         --------
 
         An int that indicates an error code (0 = no error, 5 = error reading
-        thermodynamic parameter files, 14 = traceback error).
+        thermodynamic parameter files, 14 = traceback error). 
         """
         return _RNAstructure_wrap.HybridRNA_AccessFold(self, gamma, percent, maximumstructures, window, maxinternalloopsize)
 
@@ -2887,7 +2887,7 @@ class HybridRNA(RNA):
         --------
 
         An int that indicates an error code (0 = no error, 5 = error reading
-        thermodynamic parameter files, 14 = traceback error).
+        thermodynamic parameter files, 14 = traceback error). 
         """
         return _RNAstructure_wrap.HybridRNA_FoldBimolecular(self, *args, **kwargs)
 
@@ -2934,7 +2934,7 @@ class HybridRNA(RNA):
         --------
 
         An int that indicates an error code (0 = no error, 5 = error reading
-        thermodynamic parameter files, 14 = traceback error).
+        thermodynamic parameter files, 14 = traceback error). 
         """
         return _RNAstructure_wrap.HybridRNA_FoldDuplex(self, percent, maximumstructures, window, maxinternalloopsize)
 
@@ -2969,7 +2969,7 @@ class HybridRNA(RNA):
         --------
 
         An int that indicates an error code (0 = no error, 5 = error reading
-        thermodynamic parameter files).
+        thermodynamic parameter files). 
         """
         return _RNAstructure_wrap.HybridRNA_PartitionFunctionBimolecular(self, *args, **kwargs)
 
@@ -2985,7 +2985,7 @@ class HybridRNA(RNA):
         Returns:
         --------
 
-        A pointer to the underlying RNA class for sequence 1.
+        A pointer to the underlying RNA class for sequence 1. 
         """
         return _RNAstructure_wrap.HybridRNA_GetRNA1(self)
 
@@ -3001,7 +3001,7 @@ class HybridRNA(RNA):
         Returns:
         --------
 
-        A pointer to the underlying RNA class for sequence 2.
+        A pointer to the underlying RNA class for sequence 2. 
         """
         return _RNAstructure_wrap.HybridRNA_GetRNA2(self)
 
@@ -3022,7 +3022,7 @@ class HybridRNA(RNA):
         Returns:
         --------
 
-        An integer that provides the error code.
+        An integer that provides the error code. 
         """
         return _RNAstructure_wrap.HybridRNA_GetErrorCode(self)
 
@@ -3048,7 +3048,7 @@ class HybridRNA(RNA):
         --------
 
         A pointer to a c string that provides an error message or from other
-        functions that return integer error codes.
+        functions that return integer error codes. 
         """
         return _RNAstructure_wrap.HybridRNA_GetErrorMessage(self, error)
 
@@ -3064,7 +3064,7 @@ class HybridRNA(RNA):
         --------
 
         A bool that indicates whether intramolecular pairs are forbidden (true
-        = forbidden, false = not).
+        = forbidden, false = not). 
         """
         return _RNAstructure_wrap.HybridRNA_GetForbidIntramolecular(self)
 
@@ -3083,7 +3083,7 @@ class HybridRNA(RNA):
         -----------
 
         forbid:  is a bool that indicates whether intramolecular pairs are
-        forbid.
+        forbid. 
         """
         return _RNAstructure_wrap.HybridRNA_SetForbidIntramolecular(self, forbid)
 
@@ -3100,7 +3100,7 @@ class HybridRNA(RNA):
         Parameters:
         -----------
 
-        Progress:  is a TProgressDialog class.
+        Progress:  is a TProgressDialog class. 
         """
         return _RNAstructure_wrap.HybridRNA_SetProgress(self, Progress)
 
@@ -3113,7 +3113,7 @@ class HybridRNA(RNA):
         Provide a means to stop using a TProgressDialog. StopProgress tells
         the RNA class to no longer follow progress. This should be called if
         the TProgressDialog is deleted, so that this class does not make
-        reference to it.
+        reference to it. 
         """
         return _RNAstructure_wrap.HybridRNA_StopProgress(self)
 
@@ -3133,7 +3133,7 @@ class TwoRNA(_object):
     prediction routines of RNAstructure. This contains two instances of
     the RNA class to provide the functionality of RNA.
 
-    C++ includes: TwoRNA.h
+    C++ includes: TwoRNA.h 
     """
 
     __swig_setmethods__ = {}
@@ -3146,7 +3146,7 @@ class TwoRNA(_object):
         """
         TwoRNA::TwoRNA()
 
-        Constructor Default constructor that requires no parameters.
+        Constructor Default constructor that requires no parameters. 
         """
         this = _RNAstructure_wrap.new_TwoRNA(*args)
         try:
@@ -3176,7 +3176,7 @@ class TwoRNA(_object):
         prediction method if a temperature other than the 310.15 K default is
         desired. The function returns an error code where 0 is no error and
         non-zero errors can be parsed by by GetErrorMessage() or
-        GetErrorMessageString() in an inheriting class.
+        GetErrorMessageString() in an inheriting class. 
         """
         return _RNAstructure_wrap.TwoRNA_SetTemperature(self, temperature)
 
@@ -3191,7 +3191,7 @@ class TwoRNA(_object):
         Returns:
         --------
 
-        A double that indicates the folding temperature in K.
+        A double that indicates the folding temperature in K. 
         """
         return _RNAstructure_wrap.TwoRNA_GetTemperature(self)
 
@@ -3212,7 +3212,7 @@ class TwoRNA(_object):
         Returns:
         --------
 
-        An integer that provides the error code.
+        An integer that provides the error code. 
         """
         return _RNAstructure_wrap.TwoRNA_GetErrorCode(self)
 
@@ -3240,7 +3240,7 @@ class TwoRNA(_object):
         --------
 
         A pointer to a c string that provides an error message or from other
-        functions that return integer error codes.
+        functions that return integer error codes. 
         """
         return _RNAstructure_wrap.TwoRNA_GetErrorMessage(self, error)
 
@@ -3272,7 +3272,7 @@ class TwoRNA(_object):
         Returns:
         --------
 
-        A string that provides an error message.
+        A string that provides an error message. 
         """
         return _RNAstructure_wrap.TwoRNA_GetErrorMessageString(self, error)
 
@@ -3293,7 +3293,7 @@ class TwoRNA(_object):
         Returns:
         --------
 
-        A pointer to the underlying RNA class for sequence 1.
+        A pointer to the underlying RNA class for sequence 1. 
         """
         return _RNAstructure_wrap.TwoRNA_GetRNA1(self)
 
@@ -3311,7 +3311,7 @@ class TwoRNA(_object):
         Returns:
         --------
 
-        A pointer to the underlying RNA class for sequence 2.
+        A pointer to the underlying RNA class for sequence 2. 
         """
         return _RNAstructure_wrap.TwoRNA_GetRNA2(self)
 
@@ -3334,7 +3334,7 @@ class Dynalign_object(TwoRNA):
     algorithm. The class is inherited from the TwoRNA class, which itself
     contains two instances to the class RNA.
 
-    C++ includes: Dynalign_object.h
+    C++ includes: Dynalign_object.h 
     """
 
     __swig_setmethods__ = {}
@@ -3377,7 +3377,7 @@ class Dynalign_object(TwoRNA):
 
         percent:  is the maximum percent difference in total folding free
         energy change above the lowest for suboptimal common structures. The
-        recommended default is 20.
+        recommended default is 20. 
         """
         this = _RNAstructure_wrap.new_Dynalign_object(*args)
         try:
@@ -3385,7 +3385,7 @@ class Dynalign_object(TwoRNA):
         except __builtin__.Exception:
             self.this = this
 
-    def Dynalign(self, maxtrace=20, bpwin=5, awin=1, percent=20, imaxseparation=-99, gap=0.4, singleinsert=True, savefile=0, optimalonly=False, singlefold_subopt_percent=30, local=False, numProcessors=1, maxpairs=-1):#
+    def Dynalign(self, maxtrace=20, bpwin=5, awin=1, percent=20, imaxseparation=-99, gap=0.4, singleinsert=True, savefile=0, optimalonly=False, singlefold_subopt_percent=30, local=False, numProcessors=1, maxpairs=-1):
         """
         int
         Dynalign_object::Dynalign(const short int maxtrace=20, const short int
@@ -3453,9 +3453,9 @@ class Dynalign_object(TwoRNA):
         --------
 
         An int that indicates an error code (0 = no error, non-zero = error
-        occurred).
+        occurred). 
         """
-        return _RNAstructure_wrap.Dynalign_object_Dynalign(self, maxtrace, bpwin, awin, percent, imaxseparation, gap, singleinsert,savefile, optimalonly, singlefold_subopt_percent, local, numProcessors, maxpairs)
+        return _RNAstructure_wrap.Dynalign_object_Dynalign(self, maxtrace, bpwin, awin, percent, imaxseparation, gap, singleinsert, savefile, optimalonly, singlefold_subopt_percent, local, numProcessors, maxpairs)
 
 
     def WriteAlignment(self, filename):
@@ -3472,7 +3472,7 @@ class Dynalign_object(TwoRNA):
         Parameters:
         -----------
 
-        filename:  is the file to which the alignment should be written.
+        filename:  is the file to which the alignment should be written. 
         """
         return _RNAstructure_wrap.Dynalign_object_WriteAlignment(self, filename)
 
@@ -3500,7 +3500,7 @@ class Dynalign_object(TwoRNA):
         --------
 
         An integer that indicates an error code (0 = no error, 100 =
-        nucleotide i out of range, 101 = nucleotide k out of range).
+        nucleotide i out of range, 101 = nucleotide k out of range). 
         """
         return _RNAstructure_wrap.Dynalign_object_ForceAlignment(self, i, k)
 
@@ -3523,7 +3523,7 @@ class Dynalign_object(TwoRNA):
         --------
 
         An integer that indicates the nucleotide to which i is forced to be
-        aligned, where 0 indicates no alignment.
+        aligned, where 0 indicates no alignment. 
         """
         return _RNAstructure_wrap.Dynalign_object_GetForcedAlignment(self, i, seq)
 
@@ -3550,7 +3550,7 @@ class Dynalign_object(TwoRNA):
         --------
 
         An integer that indicates an error code (0 = no error, 102 = file not
-        found, 103 = error reading constraint file).
+        found, 103 = error reading constraint file). 
         """
         return _RNAstructure_wrap.Dynalign_object_ReadAlignmentConstraints(self, filename)
 
@@ -3575,7 +3575,7 @@ class Dynalign_object(TwoRNA):
         --------
 
         An integer that indicates an error code (0=no error, 104=file not
-        found, 105=template is already specified)
+        found, 105=template is already specified) 
         """
         return _RNAstructure_wrap.Dynalign_object_Templatefromct(self, ctfilename)
 
@@ -3603,7 +3603,7 @@ class Dynalign_object(TwoRNA):
         --------
 
         An integer that indicates an error code (0=no error, 106=file not
-        found, 105=template is already specified)
+        found, 105=template is already specified) 
         """
         return _RNAstructure_wrap.Dynalign_object_Templatefromdsv(self, dsvfilename, maxdsvchange)
 
@@ -3640,7 +3640,7 @@ class Dynalign_object(TwoRNA):
         Returns:
         --------
 
-        A double that gives an energy in kcal/mol.
+        A double that gives an energy in kcal/mol. 
         """
         return _RNAstructure_wrap.Dynalign_object_GetBestPairEnergy(self, sequence, i, j)
 
@@ -3664,7 +3664,7 @@ class Dynalign_object(TwoRNA):
         Returns:
         --------
 
-        a double that gives an energy in kcal/mol.
+        a double that gives an energy in kcal/mol. 
         """
         return _RNAstructure_wrap.Dynalign_object_GetLowestEnergy(self)
 
@@ -3700,7 +3700,7 @@ class Dynalign_object(TwoRNA):
         --------
 
         A pointer to a c string that provides an error message or from other
-        functions that return integer error codes.
+        functions that return integer error codes. 
         """
         return _RNAstructure_wrap.Dynalign_object_GetErrorMessage(self, error)
 
@@ -3717,7 +3717,7 @@ class Dynalign_object(TwoRNA):
         Parameters:
         -----------
 
-        Progress:  is a TProgressDialog class.
+        Progress:  is a TProgressDialog class. 
         """
         return _RNAstructure_wrap.Dynalign_object_SetProgress(self, Progress)
 
@@ -3730,7 +3730,7 @@ class Dynalign_object(TwoRNA):
         Provide a means to stop using a TProgressDialog. StopProgress tells
         the RNA class to no longer follow progress. This should be called if
         the TProgressDialog is deleted, so that this class does not make
-        reference to it.
+        reference to it. 
         """
         return _RNAstructure_wrap.Dynalign_object_StopProgress(self)
 
@@ -3748,7 +3748,7 @@ class Multilign_object(_object):
     The Multilign_object class provides an entry point for the Multilign
     algorithm.
 
-    C++ includes: Multilign_object.h
+    C++ includes: Multilign_object.h 
     """
 
     __swig_setmethods__ = {}
@@ -3761,7 +3761,7 @@ class Multilign_object(_object):
         """
         Multilign_object::Multilign_object(const bool Multifind, const string
         &outputmultifind, const vector< string > &ctfiles, TProgressDialog
-        *progress=NULL, const bool isrna=true)
+        *progress=NULL, const bool isrna=true) 
         """
         this = _RNAstructure_wrap.new_Multilign_object(*args)
         try:
@@ -3794,7 +3794,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        an int of the number of basepairs counted.
+        an int of the number of basepairs counted. 
         """
         return _RNAstructure_wrap.Multilign_object_CountBP(self, i, j, percent)
 
@@ -3860,7 +3860,7 @@ class Multilign_object(_object):
         --------
 
         an int that indicates an error code (0 = no error, non-zero = error
-        occurred).
+        occurred). 
         """
         return _RNAstructure_wrap.Multilign_object_ProgressiveMultilign(self, numProcessors, Dsv, Ali, maxtrace, bpwin, awin, percent, imaxseparation, gap, singleinsert, singlefold_subopt_percent, local)
 
@@ -3868,7 +3868,7 @@ class Multilign_object(_object):
     def MultiTempMultilign(self):
         """
         int
-        Multilign_object::MultiTempMultilign()
+        Multilign_object::MultiTempMultilign() 
         """
         return _RNAstructure_wrap.Multilign_object_MultiTempMultilign(self)
 
@@ -3889,7 +3889,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        an int of error code.
+        an int of error code. 
         """
         return _RNAstructure_wrap.Multilign_object_WriteAlignment(self, *args, **kwargs)
 
@@ -3910,7 +3910,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        An integer that provides the error code.
+        An integer that provides the error code. 
         """
         return _RNAstructure_wrap.Multilign_object_GetErrorCode(self)
 
@@ -3936,7 +3936,7 @@ class Multilign_object(_object):
         --------
 
         A string that provides an error message or from other functions that
-        return integer error codes.
+        return integer error codes. 
         """
         return _RNAstructure_wrap.Multilign_object_GetErrorMessage(self, error)
 
@@ -3962,7 +3962,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        an errorcode.
+        an errorcode. 
         """
         return _RNAstructure_wrap.Multilign_object_SetMaxPairs(self, maxpairs)
 
@@ -3977,7 +3977,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        the value of MaxPairs
+        the value of MaxPairs 
         """
         return _RNAstructure_wrap.Multilign_object_GetMaxPairs(self)
 
@@ -3992,7 +3992,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        the average length of the input sequences.
+        the average length of the input sequences. 
         """
         return _RNAstructure_wrap.Multilign_object_AverageLength(self)
 
@@ -4013,7 +4013,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        an errorcode
+        an errorcode 
         """
         return _RNAstructure_wrap.Multilign_object_SetIterations(self, it)
 
@@ -4028,7 +4028,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        the value of iterations.
+        the value of iterations. 
         """
         return _RNAstructure_wrap.Multilign_object_GetIterations(self)
 
@@ -4049,7 +4049,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        an errorcode
+        an errorcode 
         """
         return _RNAstructure_wrap.Multilign_object_SetMaxDsv(self, maxdsvchange)
 
@@ -4064,7 +4064,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        the value of MaxDsv/maxdsvchange.
+        the value of MaxDsv/maxdsvchange. 
         """
         return _RNAstructure_wrap.Multilign_object_GetMaxDsv(self)
 
@@ -4079,7 +4079,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        the number of input sequences
+        the number of input sequences 
         """
         return _RNAstructure_wrap.Multilign_object_GetSequenceNumber(self)
 
@@ -4099,7 +4099,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        an int value of ErrorCode
+        an int value of ErrorCode 
         """
         return _RNAstructure_wrap.Multilign_object_SetIndexSeq(self, *args)
 
@@ -4114,7 +4114,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        a string of index seq filename.
+        a string of index seq filename. 
         """
         return _RNAstructure_wrap.Multilign_object_GetIndexSeq(self)
 
@@ -4124,7 +4124,7 @@ class Multilign_object(_object):
         void
         Multilign_object::Randomize()
 
-        randomize the order of inputList.
+        randomize the order of inputList. 
         """
         return _RNAstructure_wrap.Multilign_object_Randomize(self)
 
@@ -4153,7 +4153,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        a is int value of ErrorCode
+        a is int value of ErrorCode 
         """
         return _RNAstructure_wrap.Multilign_object_AddOneInput(self, *args, **kwargs)
 
@@ -4174,7 +4174,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        a int value of ErrorCode
+        a int value of ErrorCode 
         """
         return _RNAstructure_wrap.Multilign_object_RemoveOneInput(self, seq)
 
@@ -4190,7 +4190,7 @@ class Multilign_object(_object):
         -----------
 
         slope:  is a double value assigned to SHAPESlope. By default, it is
-        set to 1.8.
+        set to 1.8. 
         """
         return _RNAstructure_wrap.Multilign_object_SetSHAPESlope(self, slope)
 
@@ -4205,7 +4205,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        a SHAPESlope of double value.
+        a SHAPESlope of double value. 
         """
         return _RNAstructure_wrap.Multilign_object_GetSHAPESlope(self)
 
@@ -4221,7 +4221,7 @@ class Multilign_object(_object):
         -----------
 
         intercept:  is a double value assigned to SHAPEIntercept. By default,
-        it is set to -0.6.
+        it is set to -0.6. 
         """
         return _RNAstructure_wrap.Multilign_object_SetSHAPEIntercept(self, intercept)
 
@@ -4236,7 +4236,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        SHAPEIntercept of double value.
+        SHAPEIntercept of double value. 
         """
         return _RNAstructure_wrap.Multilign_object_GetSHAPEIntercept(self)
 
@@ -4252,7 +4252,7 @@ class Multilign_object(_object):
         -----------
 
         temp:  is a double value of temperature; by default it is set to
-        310.15K
+        310.15K 
         """
         return _RNAstructure_wrap.Multilign_object_SetTemperature(self, temp)
 
@@ -4267,7 +4267,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        a double value of the set temperature.
+        a double value of the set temperature. 
         """
         return _RNAstructure_wrap.Multilign_object_GetTemperature(self)
 
@@ -4281,7 +4281,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        an int value of error code.
+        an int value of error code. 
         """
         return _RNAstructure_wrap.Multilign_object_CleanupIntermediateFiles(self)
 
@@ -4296,7 +4296,7 @@ class Multilign_object(_object):
         Parameters:
         -----------
 
-        Progress:  is a pointer to TProgressDialog
+        Progress:  is a pointer to TProgressDialog 
         """
         return _RNAstructure_wrap.Multilign_object_SetProgress(self, Progress)
 
@@ -4307,7 +4307,7 @@ class Multilign_object(_object):
         Multilign_object::StopProgress()
 
         Provide a means to stop using a TProgressDialog by assigning NULL to
-        progress pointer.
+        progress pointer. 
         """
         return _RNAstructure_wrap.Multilign_object_StopProgress(self)
 
@@ -4322,7 +4322,7 @@ class Multilign_object(_object):
         Returns:
         --------
 
-        the pointer to TProgressDialog
+        the pointer to TProgressDialog 
         """
         return _RNAstructure_wrap.Multilign_object_GetProgress(self)
 
@@ -4336,7 +4336,7 @@ class Multilign_object(_object):
         constraints, and SHAPE filenames to stdout.
 
         The following functions are used for Diagnostic purpose only
-        //////////// Generally not needed, but for debugging input.
+        //////////// Generally not needed, but for debugging input. 
         """
         return _RNAstructure_wrap.Multilign_object_GetInputFilenames(self)
 
@@ -4347,7 +4347,7 @@ class Multilign_object(_object):
         Multilign_object::GetPairs()
 
         For diagnostic purpose only. Output the paired sequence filenames to
-        stdout.
+        stdout. 
         """
         return _RNAstructure_wrap.Multilign_object_GetPairs(self)
 
@@ -4355,7 +4355,7 @@ class Multilign_object(_object):
     def get_energies(self):
         """
         vector<float>
-        Multilign_object::get_energies()
+        Multilign_object::get_energies() 
         """
         return _RNAstructure_wrap.Multilign_object_get_energies(self)
 
@@ -4363,7 +4363,7 @@ class Multilign_object(_object):
     def get_dGIndex(self):
         """
         vector<float>
-        Multilign_object::get_dGIndex()
+        Multilign_object::get_dGIndex() 
         """
         return _RNAstructure_wrap.Multilign_object_get_dGIndex(self)
 
@@ -4384,7 +4384,7 @@ class Oligowalk_object(RNA):
     The Oligowalk_class inhereits from RNA and provides the OligoWalk
     functionality. Additionally, it provides OligoScreen.
 
-    C++ includes: Oligowalk_object.h
+    C++ includes: Oligowalk_object.h 
     """
 
     __swig_setmethods__ = {}
@@ -4412,7 +4412,7 @@ class Oligowalk_object(RNA):
         Parameters:
         -----------
 
-        IsRNA:  is a bool where true= RNA and false=DNA.
+        IsRNA:  is a bool where true= RNA and false=DNA. 
         """
         this = _RNAstructure_wrap.new_Oligowalk_object(*args)
         try:
@@ -4458,7 +4458,7 @@ class Oligowalk_object(RNA):
         --------
 
         An integer that indicates an error code that can be parsed by
-        GetErrorMessage() or GetErrorMessageString(), 0 = no error.
+        GetErrorMessage() or GetErrorMessageString(), 0 = no error. 
         """
         return _RNAstructure_wrap.Oligowalk_object_Oligowalk(self, oligo_length, isDNA, option, oligo_concentration, usesub, start, stop)
 
@@ -4484,7 +4484,7 @@ class Oligowalk_object(RNA):
         Returns:
         --------
 
-        A double that is the free energy change in kcal/mol.
+        A double that is the free energy change in kcal/mol. 
         """
         return _RNAstructure_wrap.Oligowalk_object_GetBreakTargetDG(self, index)
 
@@ -4510,7 +4510,7 @@ class Oligowalk_object(RNA):
         Returns:
         --------
 
-        A double that is the free energy change in kcal/mol.
+        A double that is the free energy change in kcal/mol. 
         """
         return _RNAstructure_wrap.Oligowalk_object_GetDuplexDG(self, index)
 
@@ -4536,7 +4536,7 @@ class Oligowalk_object(RNA):
         Returns:
         --------
 
-        A double that is the free energy change in kcal/mol.
+        A double that is the free energy change in kcal/mol. 
         """
         return _RNAstructure_wrap.Oligowalk_object_GetOligoOligoDG(self, index)
 
@@ -4562,7 +4562,7 @@ class Oligowalk_object(RNA):
         Returns:
         --------
 
-        A double that is the free energy change in kcal/mol.
+        A double that is the free energy change in kcal/mol. 
         """
         return _RNAstructure_wrap.Oligowalk_object_GetOligoSelfDG(self, index)
 
@@ -4588,7 +4588,7 @@ class Oligowalk_object(RNA):
         Returns:
         --------
 
-        A double that is the free energy change in kcal/mol.
+        A double that is the free energy change in kcal/mol. 
         """
         return _RNAstructure_wrap.Oligowalk_object_GetOverallDG(self, index)
 
@@ -4614,7 +4614,7 @@ class Oligowalk_object(RNA):
         Returns:
         --------
 
-        A double that is the Tm in degrees C.
+        A double that is the Tm in degrees C. 
         """
         return _RNAstructure_wrap.Oligowalk_object_GetTm(self, index)
 
@@ -4661,7 +4661,7 @@ class Oligowalk_object(RNA):
         --------
 
         An integer that indicates an error code that can be parsed by
-        GetErrorMessage() or GetErrorMessageString(), 0 = no error.
+        GetErrorMessage() or GetErrorMessageString(), 0 = no error. 
         """
         return _RNAstructure_wrap.Oligowalk_object_WriteReport(self, outputfilename, oligo_length, isDNA, option, oligo_concentration, usesub, start, stop)
 
@@ -4691,7 +4691,7 @@ class Oligowalk_object(RNA):
         --------
 
         An int that indicates an error code that can be parsed by
-        GetErrorMessage() or GetErrorMessageString(), 0 = no error.
+        GetErrorMessage() or GetErrorMessageString(), 0 = no error. 
         """
         return _RNAstructure_wrap.Oligowalk_object_OligoScreen(self, infilename, outfilename)
 
@@ -4715,7 +4715,7 @@ class Oligowalk_object(RNA):
         --------
 
         A pointer to a c string that provides an error message or from other
-        functions that return integer error codes.
+        functions that return integer error codes. 
         """
         return _RNAstructure_wrap.Oligowalk_object_GetErrorMessage(self, error)
 
@@ -4872,70 +4872,70 @@ multibranch_loop_t_swigregister(multibranch_loop_t)
 def hairpin(p, i, j):
     """
     hairpin_t hairpin(double p, int i,
-    int j)
+    int j) 
     """
     return _RNAstructure_wrap.hairpin(p, i, j)
 
 def internal_loop(p, i, j, k, l):
     """
     internal_loop_t
-    internal_loop(double p, int i, int j, int k, int l)
+    internal_loop(double p, int i, int j, int k, int l) 
     """
     return _RNAstructure_wrap.internal_loop(p, i, j, k, l)
 
 def basestack(p, i, j, k, l):
     """
     basestack_t basestack(double p, int
-    i, int j, int k, int l)
+    i, int j, int k, int l) 
     """
     return _RNAstructure_wrap.basestack(p, i, j, k, l)
 
 def multibranch_loop(i, j):
     """
     multibranch_loop_t
-    multibranch_loop(int i, int j)
+    multibranch_loop(int i, int j) 
     """
     return _RNAstructure_wrap.multibranch_loop(i, j)
 
 def add_branch(mb, k, l):
     """
     void add_branch(multibranch_loop_t
-    &mb, int k, int l)
+    &mb, int k, int l) 
     """
     return _RNAstructure_wrap.add_branch(mb, k, l)
 
 def show_hairpins(arg1):
     """
     void show_hairpins(vector<
-    hairpin_t >)
+    hairpin_t >) 
     """
     return _RNAstructure_wrap.show_hairpins(arg1)
 
 def show_stacks(arg1):
     """
     void show_stacks(vector<
-    basestack_t >)
+    basestack_t >) 
     """
     return _RNAstructure_wrap.show_stacks(arg1)
 
 def show_internal_loops(arg1):
     """
     void
-    show_internal_loops(vector< internal_loop_t >)
+    show_internal_loops(vector< internal_loop_t >) 
     """
     return _RNAstructure_wrap.show_internal_loops(arg1)
 
 def show_bulge_loops(arg1):
     """
     void
-    show_bulge_loops(vector< internal_loop_t >)
+    show_bulge_loops(vector< internal_loop_t >) 
     """
     return _RNAstructure_wrap.show_bulge_loops(arg1)
 
 def show_mbl(mbl):
     """
     void show_mbl(multibranch_loop_t
-    mbl)
+    mbl) 
     """
     return _RNAstructure_wrap.show_mbl(mbl)
 class mb_element(_object):
@@ -5019,7 +5019,7 @@ class ProbScan(RNA):
         function must be calculated
 
         isRNA:  is a bool that indicates whether this sequence is RNA or DNA.
-        true= RNA. false=DNA. Default is true.
+        true= RNA. false=DNA. Default is true. 
         """
         this = _RNAstructure_wrap.new_ProbScan(*args)
         try:
@@ -5044,7 +5044,7 @@ class ProbScan(RNA):
         Returns:
         --------
 
-        A double containing the probability of the hairpin
+        A double containing the probability of the hairpin 
         """
         return _RNAstructure_wrap.ProbScan_probability_of_hairpin(self, i, j)
 
@@ -5071,7 +5071,7 @@ class ProbScan(RNA):
         --------
 
         A vector of hairpin objects, containing the positions of the hairpins
-        and their probabilities
+        and their probabilities 
         """
         return _RNAstructure_wrap.ProbScan_probability_of_all_hairpins(self, min, max, threshold)
 
@@ -5098,7 +5098,7 @@ class ProbScan(RNA):
         Returns:
         --------
 
-        A double containing the probability of the internal loop
+        A double containing the probability of the internal loop 
         """
         return _RNAstructure_wrap.ProbScan_probability_of_internal_loop(self, i, j, k, l)
 
@@ -5124,7 +5124,7 @@ class ProbScan(RNA):
         --------
 
         A vector of internal loop objects, containing the positions of the
-        loops and their probabilities
+        loops and their probabilities 
         """
         return _RNAstructure_wrap.ProbScan_probability_of_all_internal_loops(self, *args, **kwargs)
 
@@ -5148,7 +5148,7 @@ class ProbScan(RNA):
         Returns:
         --------
 
-        A double containing the probability of the stack
+        A double containing the probability of the stack 
         """
         return _RNAstructure_wrap.ProbScan_probability_of_stack(self, i, j)
 
@@ -5174,7 +5174,7 @@ class ProbScan(RNA):
         Returns:
         --------
 
-        A double containing the probability of the helix
+        A double containing the probability of the helix 
         """
         return _RNAstructure_wrap.ProbScan_probability_of_helix(self, i, j, how_many_stacks)
 
@@ -5198,7 +5198,7 @@ class ProbScan(RNA):
         --------
 
         A vector of helix objects, containing the positions of the helices and
-        their probabilities
+        their probabilities 
         """
         return _RNAstructure_wrap.ProbScan_probability_of_all_helices(self, threshold, length)
 
@@ -5221,7 +5221,7 @@ class ProbScan(RNA):
         Returns:
         --------
 
-        A double containing the probability of the multibranch loop
+        A double containing the probability of the multibranch loop 
         """
         return _RNAstructure_wrap.ProbScan_probability_of_multibranch_loop(self, mb)
 
@@ -5234,7 +5234,7 @@ ProbScan_swigregister(ProbScan)
 def show_mb_element_array(arg1):
     """
     void
-    show_mb_element_array(vector< mb_element >)
+    show_mb_element_array(vector< mb_element >) 
     """
     return _RNAstructure_wrap.show_mb_element_array(arg1)
 class HairpinLoopVector(_object):
@@ -5690,3 +5690,5 @@ BaseStackVector_swigregister = _RNAstructure_wrap.BaseStackVector_swigregister
 BaseStackVector_swigregister(BaseStackVector)
 
 # This file is compatible with both classic and new-style classes.
+
+
