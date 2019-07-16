@@ -143,7 +143,7 @@ class Structure:
     def plot_fold(self,maxcol=100,save=False,**kwargs):
         strutno=len(self.dotgraph)
         plot_size =max(self.dotgraph[0].plot_size())/200*4.5 # this is estimating size of each panel
-
+        plot_size=max(plot_size,4)
         panels=panel_count(strutno+1,maxcol)
         figwidth,figheight=(max(plot_size*panels[1],8),max(plot_size*panels[0],8))
         fig = plt.figure(figsize=(figwidth,figheight))

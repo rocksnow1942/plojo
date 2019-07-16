@@ -70,7 +70,9 @@ def simu_sele_cb(attr,old,new):
 
         @keyframes mymove {
         0%  { border:4px outset #81F7F3;             }
+        20%  { border:4px outset #81F7F3;             }
         50%  { border:4px outset #ff66ff;        }
+        70%  { border:4px outset #81F7F3;             }
         100%  { border:4px outset #81F7F3;      }
         }
         </style>
