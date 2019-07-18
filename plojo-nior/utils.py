@@ -12,7 +12,7 @@ if localmode:
     upload_data_folder = _file_path
     temp_position = _file_path
 
-elif systemname.startswith('huis-mac-mini'):
+elif systemname.startswith(('huis-mac-mini','plojo')):
     _file_path = path.dirname(__file__)
     file_path = '/Users/hui/Cloudstation/R&D Backup/Plojo backup'# file path on my mac
     upload_data_folder = _file_path

@@ -1,8 +1,0 @@
-#!/bin/bash
-
-echo ""
-echo "***************************"
-echo "*    Start Plojo Server   *"
-echo "***************************"
-
-bokeh serve /Users/hui/Documents/Scripts/plojo_app/plojo /Users/hui/Documents/Scripts/plojo_app/plojo-nior /Users/hui/Documents/Scripts/plojo_app/simuojo --show

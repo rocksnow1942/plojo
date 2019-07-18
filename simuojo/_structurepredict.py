@@ -2,18 +2,23 @@ from RNAstructure import RNA
 import ViennaRNA
 from collections import defaultdict
 from itertools import combinations,product,chain
+from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 from matplotlib.gridspec import GridSpec
 from os import path,getcwd,makedirs
+import matplotlib as mpl
+from matplotlib.text import TextPath
+from matplotlib.patches import PathPatch
+from matplotlib.font_manager import FontProperties
 
 plotbackend='.png'
 
 class Structure:
     """
-    class wrapper around RNAstruture RNA class.
+    class wrapper around RNAstructure RNA class.
     then can fold and plot 2D structure.
     """
     def __init__(self,sequence='',name=None,save_loc=None):
@@ -57,29 +62,83 @@ class Structure:
         ForceSingleStranded = i (nt to be single stranded)
         if no parameters passed, remove all constraints.
         """
-        self.foldpara=kwargs.copy()
+        self.foldpara.update(kwargs)
         if self.foldpara.get('SetTemperature',None):
             self.foldpara['SetTemperature']-=273.15 # to convert K to C in self. foldpara storage.
         backbone=kwargs.pop('backbone','rna')
         self.RNA=RNA.fromString(self.seq,backbone)
         if kwargs:
             for k,i in kwargs.items():
-
-                print(k," => ", i)
-
-                if isinstance(i,(list,tuple)):
-                    for j in i:
-                        if isinstance(j,int):
-                            getattr(self.RNA,k)(j)
-                        else:
-                            getattr(self.RNA,k)(*j)
-                elif isinstance(i,(int,float)):
-                    getattr(self.RNA,k)(i)
+                if ("Force" in k) or ("SetTemp") in k:
+                    if isinstance(i,(list,tuple)):
+                        for j in i:
+                            if isinstance(j,int):
+                                getattr(self.RNA,k)(j)
+                            else:
+                                getattr(self.RNA,k)(*j)
+                    elif isinstance(i,(int,float)):
+                        getattr(self.RNA,k)(i)
         else:
             self.RNA.RemoveConstraints()
         return self
 
-    def fold(self,percent=50,window=1,maxstr=8,**kwargs):
+    def fold(self,method='RNAstructure',percent=50,window=5,maxstr=8,**kwargs):
+        """
+        """
+        maxstr = int(maxstr)
+        window = int(window)
+        self.foldpara.update(percent=percent,window=window,maximumstructures=maxstr,method=method)
+        methods={'RNAstructure':self._RNAstructure_fold,'ViennaRNA':self._ViennaRNA_fold,'Compare_RV':self._compare_method}
+        so,p,pt=methods[method](percent=percent,window=window,method=method,**kwargs)
+         # total suboptimal is the number before restricted by window size, but it is filtered by single pair.
+        self.totalsuboptimal = len(so)
+
+        self.restrict_fold(so,p,pt,window,maxstr,method)
+        return self
+
+    def restrict_fold(self,so,p,pt,window,maxstr,method):
+        self.foldpara.update(window=(window),maxstr=(maxstr))
+        temp = dict(zip(so,zip(p,pt)))
+        if method == 'RNAstructure': window = 0
+        self._dot=cluster_and_center(so,window)[0:maxstr]
+        self._prob=[temp[i][0] for i in self._dot]
+        self._pairtuple = [temp[i][1] for i in self._dot]
+        self.dotgraph = [DotGraph(self.seq,*i,name=f"Predict {k+1}") for k,i in enumerate(zip(self._dot,self._prob,self._pairtuple))]
+
+    def _ViennaRNA_fold(self,percent,**kwargs):
+        """
+        use ViennaRNA for prediction.
+        """
+        # create model details
+        md = ViennaRNA.md()
+        # activate unique multibranch loop decomposition
+        md.uniq_ML = 1
+        # create fold compound object
+        fc = ViennaRNA.fold_compound(self.seq,md)
+
+        ss,mfe=fc.mfe()
+        mferange=int(abs(mfe)*percent)
+        subopt=[(i.structure,round(i.energy,1)) for i in fc.subopt(mferange)]
+        subopt = filterlonelypair(subopt) # remove single pairs.
+        subopt.sort(key=lambda x:x[1])
+
+        # callculate prob by Boltzmann sampling
+        # rescale Boltzmann factors according to MFE
+        fc.exp_params_rescale(mfe)
+        # compute partition function to fill DP matrices
+        _=fc.pf()
+        ss = list()
+        num_samples = 10000
+        iterations  = 10
+        d  = None # pbacktrack memory object
+        for i in range(0, iterations):
+            d, i = fc.pbacktrack(num_samples, lambda x,y:y.append(x), ss, d, ViennaRNA.PBACKTRACK_NON_REDUNDANT)
+        prob = ensemble_to_prob(ss)
+        probs=[prob for i in range(len(subopt))]
+        pairtuples = [dotbracket_to_tuple(i[0]) for i in subopt]
+        return subopt,probs,pairtuples
+
+    def _RNAstructure_fold(self,percent,window,**kwargs):
         """
         percent:  is the maximum % difference in free energy in suboptimal
         structures from the lowest free energy structure. The default is 20.
@@ -94,15 +153,15 @@ class Structure:
 
         kwargs is passed to set_foldpara
         """
-        window,maxstr=int(window),int(maxstr)
-        if kwargs:
-            self.set_foldpara(**kwargs)
-        else:
-            self.RNA=RNA.fromString(self.seq)
-        self.foldpara.update(percent=percent,window=window,maximumstructures=maxstr)
+        #if using RNAstructure method, window restriction is provided from RNAstructure.
+        if kwargs.get('method',None)!='RNAstructure':
+            window = 0
+
+        self.set_foldpara(**kwargs)
         p = self.RNA
         p.PartitionFunction()
-        p.FoldSingleStrand(percent=percent,window=window,maximumstructures=maxstr)
+        print(percent,window)
+        p.FoldSingleStrand(percent=percent,window=window,maximumstructures=10000)
         allstruct=[]
         probs=[]
         pairtuples=[]
@@ -124,12 +183,19 @@ class Structure:
                     dotbracket+=')'
             pairtuples.append(pairtuple)
             allstruct.append((dotbracket,energy))
-            probs.append(prob)
-        self._dot=allstruct
-        self._prob=probs
-        self._pairtuple = pairtuples
-        self.dotgraph = [DotGraph(self.seq,*i,name=f"Predict {k+1}") for k,i in enumerate(zip(self._dot,self._prob,self._pairtuple))]
-        return self
+            probs.append(np.nan_to_num(np.array(prob)))
+        return allstruct,probs,pairtuples
+
+    def _compare_method(self,percent,window,**kwargs):
+        soV,pV,ptV=self._ViennaRNA_fold(percent,**kwargs)
+        soR,pR,ptR=self._RNAstructure_fold(percent,window,**kwargs)
+        comS=set([i[0] for i in (soV)]) & set([i[0] for i in (soR)])
+        setV=dict(zip([i[0] for i in soV],zip([i[1] for i in soV],pV,ptV)))
+        setR=dict(zip([i[0] for i in soR],zip([i[1] for i in soR],pR,ptR)))
+        so_c = [(i,(setR[i][0],setV[i][0])) for i in comS]
+        p_c = [(setV[i][1]+setR[i][1])/2 for i in comS]
+        pt_c = [setV[i][2] for i in comS]
+        return so_c,p_c,pt_c
 
     def print(self):
         s=self.seq
@@ -148,7 +214,10 @@ class Structure:
         figwidth,figheight=(max(plot_size*panels[1],8),max(plot_size*panels[0],8))
         fig = plt.figure(figsize=(figwidth,figheight))
         # fig,axes = plt.subplots(*panels,figsize=(max(6*panels[1],8),max(6*panels[0],8)))
-        fig.suptitle(f'{self.name} Structure Prediction',family='fantasy',fontsize=20,weight='bold')
+        method=self.foldpara['method']
+        N=self.totalsuboptimal
+        if method=='Compare_RV': method='RNAstructure + ViennaRNA'
+        fig.suptitle(f'{self.name} {method} => {strutno}/{N}',family='fantasy',fontsize=20,weight='bold')
 
         cbgs=GridSpec(1,1,left=0.5-2/figwidth,right=0.5+2/figwidth,top=0.01+0.1/figheight,bottom=0.01)
         cbax=fig.add_subplot(cbgs[0])
@@ -164,7 +233,7 @@ class Structure:
         cbax.text(259,0.2,"{:.2f}".format(maxprob),fontsize=12)
         cbax.set_axis_off()
         cbax.set_title('Base pair probability')
-        ploggs = GridSpec(*panels,left=0.05,right=0.95,top=1-1.3/figheight,bottom=0.01+0.25/figheight)
+        ploggs = GridSpec(*panels,left=0.05,right=0.95,top=0.99-1.3/figheight,bottom=0.01+0.25/figheight)
         axes=[]
         for c,(i,j) in zip(range(strutno+1),product(range(panels[0]),range(panels[1]))):
             axes.append(fig.add_subplot(ploggs[i,j]))
@@ -178,6 +247,7 @@ class Structure:
         text="Folding Parameter:\n"+'\n'.join(["{} : {}".format(k,str(i)) for k,i in self.foldpara.items()])
         ax.text(0.01,0.85,text, transform=ax.transAxes, fontsize=max(int(3*plot_size),8),verticalalignment='top',family='monospace')
         if save:
+            plotbackend=kwargs.get('plotbackend','.png')
             save = save if isinstance(save,str) else '2DP_'+self.name
             save = self.ifexist(save+plotbackend)
             plt.savefig(save,dpi=150)
@@ -958,11 +1028,12 @@ class DotGraph(DotGraphConstructor):
         return min(rotate,key=lambda x:abs(x[0]-x[1])/max(x[0],x[1]) )
 
     def plot_2d(self,ax=None,backbone_kwargs = {},basepair_kwargs={},
-                text_kwargs={},ntnum_kwargs={},**kwargs):
+                text_kwargs={},ntnum_kwargs={},ele_kwargs={},**kwargs):
         """
         backbone_kwargs: pass to ax.plot for draw backbone.
         basepair_kwargs : color can be a matplotlib color map.
-        text_kwargs : pass to ax.annotate for nt name and element name
+        text_kwargs : pass to ax.annotate for nt name
+        ele_kwargs : pass to element name
         ntnum_kwargs:pass to nt number.
         """
         # get coordinates
@@ -1007,30 +1078,57 @@ class DotGraph(DotGraphConstructor):
         for s in self.stem_iterator():
             for p1, p2 in self.stem_bp_iterator(s):
                 basepairs.append([coords[p1-1], coords[p2-1]])
-                basepairprob.append(self.prob[min(p1,p2)])
+                basepairprob.append(max(self.prob[p1-1],self.prob[p2-1]))
         if basepairs:
             basepairs = np.array(basepairs)
-            bpkwargs = { "zorder":0, "linewidth":4,"linestyle":"-"}
+            bpkwargs = { "zorder":0, "linewidth":3,"linestyle":"-"}
             bpkwargs.update(basepair_kwargs)
             colormapper=scalar_to_rgb(basepairprob+[kwargs.pop('maxprob',0)],bpkwargs.pop('color','cool'))
             for i,j,p in zip(basepairs[:,:,0],basepairs[:,:,1],basepairprob):
                 ax.plot(i,j,color=colormapper(p),**bpkwargs)
+        #
+        # # draw circle and letters
+        # ntcolor=dict(zip('ATGCU',['red','green','yellow','blue','green']))
+        # for i, coord in enumerate(coords):
+        #     nucleotide=self.seq[i]
+        #     circle = plt.Circle((coord[0], coord[1]),
+        #                         edgecolor=ntcolor[nucleotide], radius=2.5,facecolor="white")
+        #     ax.add_artist(circle)
+        #     txtkwargs={"fontweight":"bold","fontsize":6}
+        #     txtkwargs.update(text_kwargs)
+        #     if self.seq:
+        #         ax.annotate(self.seq[i],xy=coord, ha="center", va="center", **txtkwargs )
+
+
 
         # draw circle and letters
-        ntcolor=dict(zip('ATGCU',['red','green','yellow','blue','green']))
+        fp = FontProperties(family="Arial", weight='bold')
+        LETTERS = {"T": TextPath((-1.9, -2.2), "T", size=6, prop=fp),
+                   "G": TextPath((-2.3, -2), "G", size=6, prop=fp),
+                   "A": TextPath((-2.1, -2), "A", size=6, prop=fp),
+                   "C": TextPath((-2.1, -2), "C", size=6, prop=fp),
+                   "U":TextPath( (-2.1, -2.1), "U", size=6, prop=fp)}
+        ntcolor=dict(zip('ATGCU',['red','green','sienna','blue','green']))
         for i, coord in enumerate(coords):
             nucleotide=self.seq[i]
             circle = plt.Circle((coord[0], coord[1]),
-                                edgecolor=ntcolor[nucleotide], facecolor="white")
+                                edgecolor='black', radius=2.85,facecolor=ntcolor[nucleotide])#"white"
             ax.add_artist(circle)
-            txtkwargs={"fontweight":"bold"}
+            txtkwargs={"fontweight":"bold","fontsize":6}
             txtkwargs.update(text_kwargs)
             if self.seq:
-                ax.annotate(self.seq[i],xy=coord, ha="center", va="center", **txtkwargs )
+                letter=self.seq[i]
+                text = LETTERS[letter]
+                t = mpl.transforms.Affine2D().translate(coord[0],coord[1]) + ax.transData
+
+                p = PathPatch(
+                    text, lw=0,fc='white',transform=t)#fc=ntcolor[letter]
+                ax.add_artist(p)
+
 
         # draw nt index from 5 to 10.
         all_coords=list(coords)
-        nt_kwargs = {"color":"black"}
+        nt_kwargs = {"color":"black","fontsize":10}
         nt_kwargs.update(ntnum_kwargs)
         # ntnum_kwargs.update(text_kwargs)
         for nt in range(5, self.seq_length, 5):
@@ -1041,8 +1139,14 @@ class DotGraph(DotGraphConstructor):
                             arrowprops={"width":0.5, "headwidth":0.5, "color":"gray"},
                             ha="center", va="center", zorder=0, **nt_kwargs)
                 all_coords.append(annot_pos)
+
+
+
+        # annotate stemloop elements.
+        elekwargs = {"color":"black","fontsize":10}
+        elekwargs.update(ele_kwargs)
         annotations={}
-        _annotate_rna_plot(ax, self, all_coords, annotations, txtkwargs)
+        _annotate_rna_plot(ax, self, all_coords, annotations, elekwargs)
         datalim = ((min(list(coords[:, 0]) + [ax.get_xlim()[0]]),
                     min(list(coords[:, 1]) + [ax.get_ylim()[0]])),
                    (max(list(coords[:, 0]) + [ax.get_xlim()[1]]),
@@ -1321,9 +1425,6 @@ def _annotate_rna_plot(ax, cg, coords, annotations, text_kwargs):
             # print("Cannot annotate %s as '%s' , because of insufficient space." % (mloop, annot_dict[mloop]))
 
 
-
-
-
 def panel_count(n,maxcol):
     r=int(np.ceil(np.sqrt(n)))
     if r <=maxcol:
@@ -1332,3 +1433,104 @@ def panel_count(n,maxcol):
     else:
         row=int(np.ceil(n/maxcol))
         return (row,maxcol)
+
+
+
+def dotbracket_to_tuple(struct):
+    """
+    Converts arbitrary structure in dot bracket format to pair table (ViennaRNA format).
+    """
+    bracket_left = "([{<ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    bracket_right = ")]}>abcdefghijklmnopqrstuvwxyz"
+
+    if len(struct) == 0:
+        raise ValueError("Cannot convert empty structure to pairtable")
+    pt = [0] * ((len(struct) + 1) - struct.count("&"))
+    pt[0] = len(struct) - struct.count("&")
+
+    stack = defaultdict(list)
+    inverse_bracket_left = dict(zip(bracket_left,range(len(bracket_left))))
+    inverse_bracket_right =  dict(zip(bracket_right,range(len(bracket_left))))
+
+    i = 0
+    for a in struct:
+        if a == '&':
+            continue
+        i += 1
+        # print i,a, pt
+        if a == ".":
+            pt[i] = 0
+        else:
+            if a in inverse_bracket_left:
+                stack[inverse_bracket_left[a]].append(i)
+            else:
+                assert a in inverse_bracket_right , ('NOt in right {}'.format(a))
+                if len(stack[inverse_bracket_right[a]]) == 0:
+                    raise ValueError('Too many closing brackets!')
+                j = stack[inverse_bracket_right[a]].pop()
+                pt[i] = j
+                pt[j] = i
+
+    if any([len(stack[i]) != 0  for i in range(len(bracket_left))]):
+        raise ValueError('Too many opening brackets!')
+
+    tuples = []
+    for i, p in enumerate(pt[1:]):
+        tuples += [(i + 1, p)]
+
+    return tuples
+
+def ensemble_to_prob(ensemble):
+    ens=np.array([ [k!='.' for k in i] for i in ensemble],int)
+    ens=ens.mean(axis=0)
+    return ens
+
+
+
+def kdistance(s1,s2):
+    return sum([i!=j for i,j in zip(s1,s2)])
+
+def cluster_and_center(list_of_seq, distance):
+    result_key = [list_of_seq[0][0]]
+    result = {list_of_seq[0][0]: []}
+    for k,(i,e) in (enumerate(list_of_seq)):
+
+        temp = i
+        discalc=partial(kdistance,s2=i)
+        distlist = list(map(discalc,result_key))
+        if min(distlist)<=distance:
+            temp = result_key[distlist.index(min(distlist))]
+        if temp == i:
+            result_key.append(i)
+            result.update({i: [(i,e)]})
+        else:
+            result[temp].append((i,e))
+
+    result=[(findcenter(j)[0],findcenter(j)[1]) for i,j in result.items()]
+    result.sort(key=lambda x:x[1])
+    return result
+
+
+
+
+def findcenter(listofseq,method='min'):
+    if method=='center':
+        distance = dict.fromkeys(listofseq,0)
+        for i,j in combinations(listofseq,2):
+            dis=kdistance(i[0],j[0])
+            distance[i]+=dis
+            distance[j]+=dis
+        return min(distance.items(),key=lambda x:x[1])[0]
+    elif method == 'min':
+        return min(listofseq,key = lambda x:x[1])
+
+
+
+def filterlonelypair(seq_energy_pair):
+    res=[]
+    for i,j in seq_energy_pair:
+        if '.).' in i or '.(.' in i:
+            pass
+        else:
+            res.append((i,j))
+    return res

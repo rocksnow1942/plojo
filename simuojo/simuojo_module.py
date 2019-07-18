@@ -3,16 +3,22 @@ from os import path
 import shelve
 from bokeh.plotting import figure, ColumnDataSource
 from bokeh.models import HoverTool,Slider,RangeSlider
-from bokeh.models.widgets import Button, TextInput,PreText,Div,TextAreaInput,Select
+from bokeh.models.widgets import Button, TextInput,PreText,Div,TextAreaInput,Select,Dropdown
 from bokeh.layouts import widgetbox,column,row
 import numpy as np
 from simu_utils import file_save_location,file_name
-from _structurepredict import Structure,plotbackend
+# from _structurepredict import Structure,plotbackend
 import datetime
+
+try:
+    from _structurepredict import Structure
+except:
+     Structure=None
+
+
 
 cache_loc=path.join(path.dirname(__file__),'static','cache')
 
-global register
 
 class Data():
     def __init__(self,data_index):
@@ -441,6 +447,7 @@ class DR_5PL():
         self.p.title.text='Data Saved to plojo.'
 
 class Kd_simu():
+
     def __init__(self):
         para_text = PreText(text='Binding Parameters')
         self.slider_kd = Slider(title='log(Kd) (nM)', start=-3, end=3, step=0.01, value=0)
@@ -966,13 +973,13 @@ class structure_prediction():
     def __init__(self):
         self.sequence =TextAreaInput(title="Enter Sequence:",rows=5,cols=145,max_length=5000,width=1000)
         width=150
-        self.predict = Button(label=chr(9193)+'Predict'+chr(127922),button_type='success',width=width)
-        self.reset = Button(label=chr(128260)+'Reset'+chr(127859),button_type='warning',width=width)
+        self.predict = Button(label=chr(9193)+' Predict '+chr(127922),button_type='success',width=width)
+        self.reset = Button(label=chr(128260)+' Reset '+chr(127859),button_type='warning',width=width)
         self.name=TextInput(title='Sequence Name',value='NewSequence',width=width)
         self.inputa_backbone =Select(title='Backbone type:',value='rna',options=[('rna','RNA'),('dna','DNA')],width=width)
         self.inputb_SetTemperature = TextInput(title='Set Temperature (C):',value='37',width=width)
         self.inputc_percent= TextInput(title='Max % suboptimal',value='50',width=width)
-        self.inputd_window = TextInput(title='Window',value='1',width=width)
+        self.inputd_window = TextInput(title='Window',value='2',width=width)
         self.inpute_maxstr = TextInput(title='Max Structure NO',value='8',width=width)
         self.inputf_ForceSingleStranded =TextInput(title='Force Single Strand',value='None',width=width)
         self.inputg_ForceDoubleStranded = TextInput(title='Force Double Strand',value='None',width=width)
@@ -980,11 +987,17 @@ class structure_prediction():
         self.inputi_ForceProhibitPair = TextInput(title='Force No Pair',value='None',width=width)
         self.inputj_ForceModification = TextInput(title='Modification Site',value='None',width=width)
         self.inputk_ForceFMNCleavage = TextInput(title='FMN Cleavage',value='None',width=width)
+        self.method = Select(title='Prediction Algorithm',value='RNAstructure',width=width,
+                                    options=[('RNAstructure','RNAstructure'),('ViennaRNA','ViennaRNA'),('Compare_RV','Compare RS and VR')])
+        self.plotbackend = Dropdown(label=chr(127889)+' Plot Format', button_type='success',value='.png',menu = [('PNG','.png'),('SVG','.svg')],width=width)
         self.default = ['rna','37','50','1','8']+['None']*6
         self.parainputs = [i for k,i in sorted(self.__dict__.items(),key=lambda x:x[0]) if k.startswith('input')]
-        self.div=Div(text='',width=50)
+        self.div=Div(width=50)
+        self.div1=Div(width=50)
         self.text="""
-        <h2>Secondary Structure Prediction - based on <a href='https://rna.urmc.rochester.edu/RNAstructure.html'>RNAstructure package <a></h2>
+        <h2>Secondary Structure Prediction</h2>
+        <h3>- based on <a href='https://rna.urmc.rochester.edu/RNAstructure.html'>RNAstructure package<a> and
+            <a href='https://www.tbi.univie.ac.at/RNA/'> ViennaRNA package<a> </h3>
         <p>Predicts the lowest free energy structure and suboptimal structures.</p>
         <h3>How To Use:</h3>
         <p>1. <b>Enter Sequence</b> Only enter oligo sequence. Case doesn't matter. Letters other than "ATGCUatgcu" will be automatically filtered out.
@@ -1017,10 +1030,11 @@ class structure_prediction():
         bottom= Div(text="""
         <p align='center'><a href='http://www.aptitudemedical.com'>Aptitude Medical Systems, Inc.<a></p>
         """,width=800,height=50)
-        self.layout=([self.sequence],[widgetbox(self.name,*self.parainputs),column(row(self.predict,self.div,self.reset),self.plot)],[bottom])
+        self.layout=([self.sequence],[widgetbox(self.name,self.method,*self.parainputs),column(row(self.predict,self.div,self.reset,self.div1,self.plotbackend),self.plot)],[bottom])
         self.predict.on_click(self.predict_cb)
         self.reset.on_click(self.reset_cb)
         self.status=0
+        self.plotbackendstatus='.png'
 
 
     def reset_cb(self):
@@ -1037,7 +1051,7 @@ class structure_prediction():
         return seq
 
     def parsepara(self):
-        para={}
+        para={'method':self.method.value}
         for k,i in filter(lambda x:x[0].startswith('input'),self.__dict__.items()):
             key=k.split('_')[1]
             value=i.value.strip()
@@ -1059,29 +1073,34 @@ class structure_prediction():
         return para
 
     def clear_cache(self):
-        file_list = sorted(glob.glob(path.join(cache_loc,'*'+plotbackend)),key=lambda x: path.getmtime(x))
-
+        file_list = sorted(glob.glob(path.join(cache_loc,'*')),key=lambda x: path.getmtime(x))
         if len(file_list)>5:
             os.remove(file_list[0])
         return len(file_list)
 
     def predict_cb(self,):
         name=self.name.value
+        backend=self.plotbackend.value
+
         try:
             sequence=self.parsesequence(self.sequence.value)
             para=self.parsepara()
-            self.clear_cache()
             ct=para.copy()
             ct.update(sequence=sequence,name=name)
-            if ct == self.status:
+            if ct == self.status and backend==self.plotbackendstatus:
                 return 0
+
             self.status=ct
+            self.plotbackendstatus=backend
+            self.clear_cache()
             save = name +'_'+ datetime.datetime.now().strftime("%m%d_%H%M%S")
             rna=Structure(sequence,name,save_loc=cache_loc)
-            h,w=rna.fold(**para).plot_fold(save=save)
+
+            h,w=rna.fold(**para).plot_fold(save=save,plotbackend=self.plotbackendstatus)
+
             figh,figw= 800*h/(max(h,w)),800*w/(max(h,w))
             self.plot.text="""
             <img src="simuojo/static/cache/{}"  hspace='20' height='{:.0f}' width='{:.0f}'>
-            """.format(save+plotbackend,figh,figw)
+            """.format(save+self.plotbackendstatus,figh,figw)
         except Exception as e:
             self.plot.text=str(e)

@@ -42,7 +42,6 @@ view_data_plot.add_glyph(updatenote,update_)
 _updatenote
 
 
-
 # define raw data class and load rawdata.
 class Data():
     """
