@@ -13,17 +13,17 @@ import matplotlib as mpl
 from matplotlib.text import TextPath
 from matplotlib.patches import PathPatch
 from matplotlib.font_manager import FontProperties
+from MSA import Alignment
 
-plotbackend='.png'
 
 class Structure:
     """
     class wrapper around RNAstructure RNA class.
     then can fold and plot 2D structure.
     """
-    def __init__(self,sequence='',name=None,save_loc=None):
-        self.seq=sequence
-        self.name=name or "New"
+    def __init__(self,align=None,name=None,save_loc=None):
+        self.align=align if isinstance(align,Alignment) else Alignment(align,name=name)
+        self.name=name or align.name
         self.foldpara={}
         if save_loc:self.save_loc=save_loc
 
@@ -45,64 +45,56 @@ class Structure:
             return path.join(savefolder,name)
 
     @property
+    def seq(self):
+        return self.align.rep_seq()
+
+    @property
     def seq_length(self):
         return len(self.seq)
+    @property
+    def totalsuboptimal(self):
+        return len(self._dot)
+    @property
+    def afterrestrictsuboptimal(self):
+        return len(self.dot)
 
-    def set_foldpara(self,**kwargs):
-        """
-        wrapper to set parameters for RNAstructure object.
-        SetTemperature = 310.15 (default 310.15 K)
-        backbone = 'rna' (or 'dna',default is rna)
-        ForceDoubleStranded = i (index of nucleotide to be paired)
-        ForceFMNCleavage = i (FMN cleavage site, U in GU pair)
-        ForceMaximumPairingDistance = distance (maximum distance between paired nt)
-        ForceModification = i (chemical modification, this nt will be single strand or end of helix or adjacent to GU pair)
-        ForcePair = [(i,j)] (list of pairs to form)
-        ForceProhibitPair = [(i,j)] (list of pairs not allowed)
-        ForceSingleStranded = i (nt to be single stranded)
-        if no parameters passed, remove all constraints.
-        """
-        self.foldpara.update(kwargs)
-        if self.foldpara.get('SetTemperature',None):
-            self.foldpara['SetTemperature']-=273.15 # to convert K to C in self. foldpara storage.
-        backbone=kwargs.pop('backbone','rna')
-        self.RNA=RNA.fromString(self.seq,backbone)
-        if kwargs:
-            for k,i in kwargs.items():
-                if ("Force" in k) or ("SetTemp") in k:
-                    if isinstance(i,(list,tuple)):
-                        for j in i:
-                            if isinstance(j,int):
-                                getattr(self.RNA,k)(j)
-                            else:
-                                getattr(self.RNA,k)(*j)
-                    elif isinstance(i,(int,float)):
-                        getattr(self.RNA,k)(i)
-        else:
-            self.RNA.RemoveConstraints()
-        return self
+    @property
+    def energy(self):
+        dot = getattr(self,'dot',None) or getattr(self,'_dot',[])
+        return [i[1] for i in dot]
 
-    def fold(self,method='RNAstructure',percent=50,window=5,maxstr=8,**kwargs):
+    def fold(self,method='RNAstructure',percent=50,**kwargs):
         """
+        method: RNAstructure, ViennaRNA,Compare_RV
+        generate all possible dotbrackets
         """
-        maxstr = int(maxstr)
-        window = int(window)
-        self.foldpara.update(percent=percent,window=window,maximumstructures=maxstr,method=method)
-        methods={'RNAstructure':self._RNAstructure_fold,'ViennaRNA':self._ViennaRNA_fold,'Compare_RV':self._compare_method}
-        so,p,pt=methods[method](percent=percent,window=window,method=method,**kwargs)
+        self.foldpara.update(percent=percent,method=method)
+        methods={'RNAstructure':self._RNAstructure_fold,'ViennaRNA':self._ViennaRNA_fold,
+            'Compare_RV':self._compare_method}
+        self._dot,self._prob,self._pairtuple=methods[method](percent=percent,**kwargs)
          # total suboptimal is the number before restricted by window size, but it is filtered by single pair.
-        self.totalsuboptimal = len(so)
-
-        self.restrict_fold(so,p,pt,window,maxstr,method)
+        # self.restrict_fold(so,p,pt,window,maxstr,method)
         return self
 
-    def restrict_fold(self,so,p,pt,window,maxstr,method):
+    def restrict_fold(self,window,cluster='hamming',center='energy'):
+        """
+        restrict fold to certain ones.
+        cluster : cluster method
+        center :
+        """
+        self.foldpara.update(window=window)
+        so,p,pt=self._dot,self._prob,self._pairtuple
         temp = dict(zip(so,zip(p,pt)))
-        if method == 'RNAstructure': window = 0
-        self._dot=cluster_and_center(so,window)[0:maxstr]
-        self._prob=[temp[i][0] for i in self._dot]
-        self._pairtuple = [temp[i][1] for i in self._dot]
-        self.dotgraph = [DotGraph(self.seq,*i,name=f"Predict {k+1}") for k,i in enumerate(zip(self._dot,self._prob,self._pairtuple))]
+        self.dot=cluster_and_center(so,window,cluster=cluster,center=center)
+        self.prob=[temp[i][0] for i in self.dot]
+        self.pairtuple = [temp[i][1] for i in self.dot]
+        return self
+
+    def init_dotgraph(self,maxstr=8):
+
+        dot = self.dot[0:int(maxstr)]
+        self.dotgraph = [DotGraph(self.seq,*i,name=f"Predict {k+1}") for k,i in enumerate(zip(dot,self.prob,self.pairtuple))]
+        return self
 
     def _ViennaRNA_fold(self,percent,**kwargs):
         """
@@ -154,7 +146,7 @@ class Structure:
         pairtuples = [dotbracket_to_tuple(i[0]) for i in subopt]
         return subopt,probs,pairtuples
 
-    def _RNAstructure_fold(self,percent,window,**kwargs):
+    def _RNAstructure_fold(self,percent,**kwargs):
         """
         percent:  is the maximum % difference in free energy in suboptimal
         structures from the lowest free energy structure. The default is 20.
@@ -166,18 +158,40 @@ class Structure:
         structures should be from each other (0=no restriction and larger
         integers require structures to be more different). The defaults is 5,
         but this should be customized based on sequence length.
-
         kwargs is passed to set_foldpara
+        wrapper to set parameters for RNAstructure object.
+        SetTemperature = 310.15 (default 310.15 K)
+        backbone = 'rna' (or 'dna',default is rna)
+        ForceDoubleStranded = i (index of nucleotide to be paired)
+        ForceFMNCleavage = i (FMN cleavage site, U in GU pair)
+        ForceMaximumPairingDistance = distance (maximum distance between paired nt)
+        ForceModification = i (chemical modification, this nt will be single strand or end of helix or adjacent to GU pair)
+        ForcePair = [(i,j)] (list of pairs to form)
+        ForceProhibitPair = [(i,j)] (list of pairs not allowed)
+        ForceSingleStranded = i (nt to be single stranded)
+        if no parameters passed, remove all constraints.
         """
-        #if using RNAstructure method, window restriction is provided from RNAstructure.
-        if kwargs.get('method',None)!='RNAstructure':
-            window = 0
+        self.foldpara.update(kwargs)
+        if self.foldpara.get('SetTemperature',None):
+            self.foldpara['SetTemperature']-=273.15 # to convert K to C in self. foldpara storage.
+        backbone=kwargs.pop('backbone','rna')
+        p=RNA.fromString(self.seq,backbone)
+        if kwargs:
+            for k,i in kwargs.items():
+                if ("Force" in k) or ("SetTemp") in k:
+                    if isinstance(i,(list,tuple)):
+                        for j in i:
+                            if isinstance(j,int):
+                                getattr(p,k)(j)
+                            else:
+                                getattr(p,k)(*j)
+                    elif isinstance(i,(int,float)):
+                        getattr(p,k)(i)
+        else:
+            p.RemoveConstraints()
 
-        self.set_foldpara(**kwargs)
-        p = self.RNA
         p.PartitionFunction()
-        print(percent,window)
-        p.FoldSingleStrand(percent=percent,window=window,maximumstructures=10000)
+        p.FoldSingleStrand(percent=percent,window=0,maximumstructures=10000)
         allstruct=[]
         probs=[]
         pairtuples=[]
@@ -202,9 +216,9 @@ class Structure:
             probs.append(np.nan_to_num(np.array(prob)))
         return allstruct,probs,pairtuples
 
-    def _compare_method(self,percent,window,**kwargs):
+    def _compare_method(self,percent,**kwargs):
         soV,pV,ptV=self._ViennaRNA_fold(percent,**kwargs)
-        soR,pR,ptR=self._RNAstructure_fold(percent,window,**kwargs)
+        soR,pR,ptR=self._RNAstructure_fold(percent,**kwargs)
         comS=set([i[0] for i in (soV)]) & set([i[0] for i in (soR)])
         setV=dict(zip([i[0] for i in soV],zip([i[1] for i in soV],pV,ptV)))
         setR=dict(zip([i[0] for i in soR],zip([i[1] for i in soR],pR,ptR)))
@@ -220,7 +234,7 @@ class Structure:
             r.append('Predict {} Energy = {}'.format(_+1,j))
             r.append(s)
             r.append(i)
-        print('\n'.join(r))
+        return ('\n'.join(r))
 
     def plot_fold(self,maxcol=100,save=False,**kwargs):
         strutno=len(self.dotgraph)
@@ -232,15 +246,16 @@ class Structure:
         # fig,axes = plt.subplots(*panels,figsize=(max(6*panels[1],8),max(6*panels[0],8)))
         method=self.foldpara['method']
         N=self.totalsuboptimal
+        M = self.afterrestrictsuboptimal
         if method=='Compare_RV': method='RNAstructure + ViennaRNA'
-        fig.suptitle(f'{self.name} {method} => {strutno}/{N}',family='fantasy',fontsize=20,weight='bold')
+        fig.suptitle(f'{self.name} {method} => {M}/{N}',family='fantasy',fontsize=20,weight='bold')
 
         cbgs=GridSpec(1,1,left=0.5-2/figwidth,right=0.5+2/figwidth,top=0.01+0.1/figheight,bottom=0.01)
         cbax=fig.add_subplot(cbgs[0])
         gradient = np.linspace(0, 1, 256)
         gradient = np.vstack((gradient,gradient))
         color=kwargs.get('basepair_kwargs',{}).get('color','cool')
-        maxprob=np.max(self._prob)
+        maxprob=np.max(self.prob)
         cbax.imshow(gradient,aspect='auto',cmap=plt.get_cmap(color))
         cbax.set_xlim(-85,256+85)
         cbax.set_ylim(0,2)
@@ -1118,17 +1133,35 @@ class DotGraph(DotGraphConstructor):
 
 
         # draw circle and letters
-        fp = FontProperties(family="Arial", weight='bold')
-        LETTERS = {"T": TextPath((-1.9, -2.2), "T", size=6, prop=fp),
-                   "G": TextPath((-2.3, -2), "G", size=6, prop=fp),
-                   "A": TextPath((-2.1, -2), "A", size=6, prop=fp),
-                   "C": TextPath((-2.1, -2), "C", size=6, prop=fp),
-                   "U":TextPath( (-2.1, -2.1), "U", size=6, prop=fp)}
-        ntcolor=dict(zip('ATGCU',['red','green','sienna','blue','green']))
+        fp = FontProperties(family="monospace", weight='bold')
+        # LETTERS = {"T": TextPath((-1.9, -2.2), "T", size=6, prop=fp),
+        #            "G": TextPath((-2, -2), "G", size=6, prop=fp),
+        #            "A": TextPath((-2, -2), "A", size=6, prop=fp),
+        #            "C": TextPath((-2, -2), "C", size=6, prop=fp),
+        #            "U":TextPath( (-2, -2.1), "U", size=6, prop=fp),
+        #            "W":TextPath( (-2, -2.1), "W", size=6, prop=fp),
+        #            "S":TextPath( (-2, -2.1), "S", size=6, prop=fp),
+        #            "M":TextPath( (-2, -2.1), "M", size=6, prop=fp),
+        #            "K":TextPath( (-2, -2.1), "K", size=6, prop=fp),
+        #            "R":TextPath( (-2, -2.1), "R", size=6, prop=fp),
+        #            "Y":TextPath( (-2, -2.1), "Y", size=6, prop=fp),
+        #            "B":TextPath( (-2, -2.1), "B", size=6, prop=fp),
+        #            "D":TextPath( (-2, -2.1), "D", size=6, prop=fp),
+        #            "H":TextPath( (-2, -2.1), "H", size=6, prop=fp),
+        #            "V":TextPath( (-2, -2.1), "V", size=6, prop=fp),
+        #            "N":TextPath( (-2, -2.1), "N", size=6, prop=fp),
+        #            "-":TextPath( (-2, -2.1), "-", size=6, prop=fp),
+        #            }
+        vocal="ATGCUWSMKRYBDHVN"
+        LETTERS = {i:TextPath( (-2, -2), i, size=6, prop=fp ) for i in vocal+vocal.lower()+'-'}
+        def default():
+            return 'black'
+        ntcolor=defaultdict(default)
+        ntcolor.update(dict(zip('ATGCU',['red','green','sienna','blue','green'])))
         for i, coord in enumerate(coords):
             nucleotide=self.seq[i]
             circle = plt.Circle((coord[0], coord[1]),
-                                edgecolor='black', radius=2.85,facecolor=ntcolor[nucleotide])#"white"
+                                edgecolor='black', radius=2.85,facecolor=ntcolor[nucleotide.upper()])#"white"
             ax.add_artist(circle)
             txtkwargs={"fontweight":"bold","fontsize":6}
             txtkwargs.update(text_kwargs)
@@ -1506,10 +1539,11 @@ def ensemble_to_prob(ensemble):
 def kdistance(s1,s2):
     return sum([i!=j for i,j in zip(s1,s2)])
 
-def cluster_and_center(list_of_seq, distance,method='tree'):
-    methods={'hamming':kdistance,'tree':tree_edit_distance}
-    function = methods[method]
-
+def cluster_and_center(list_of_seq, distance,cluster='hamming',center='energy'):
+    if not distance:
+        return list_of_seq
+    methods={'hamming':kdistance,'tree':tree_edit_distance,'basepair':basepair_distance}
+    function = methods[cluster]
     result_key = [list_of_seq[0][0]]
     result = {list_of_seq[0][0]: []}
     for k,(i,e) in (enumerate(list_of_seq)):
@@ -1525,22 +1559,21 @@ def cluster_and_center(list_of_seq, distance,method='tree'):
         else:
             result[temp].append((i,e))
 
-    result=[(findcenter(j)[0],findcenter(j)[1]) for i,j in result.items()]
+    result=[ findcenter(j,method=center) for i,j in result.items()]
     result.sort(key=lambda x:x[1])
     return result
 
 
-def findcenter(listofseq,method='min'):
-    if method=='center':
+def findcenter(listofseq,method='energy'):
+    if method=='distance':
         distance = dict.fromkeys(listofseq,0)
         for i,j in combinations(listofseq,2):
             dis=kdistance(i[0],j[0])
             distance[i]+=dis
             distance[j]+=dis
         return min(distance.items(),key=lambda x:x[1])[0]
-    elif method == 'min':
+    elif method == 'energy':
         return min(listofseq,key = lambda x:x[1])
-
 
 
 def filterlonelypair(seq_energy_pair):
@@ -1553,7 +1586,6 @@ def filterlonelypair(seq_energy_pair):
     return res
 
 
-
 def tree_edit_distance(s1,s2,):
     xstruc = ViennaRNA.expand_Full(s1)
     T1 = ViennaRNA.make_tree(xstruc)
@@ -1562,3 +1594,6 @@ def tree_edit_distance(s1,s2,):
     RNA.edit_backtrack = 1
     tree_dist = ViennaRNA.tree_edit_distance(T1, T2)
     return tree_dist
+
+def basepair_distance(s1,s2):
+    return ViennaRNA.bp_distance(s1,s2)
