@@ -15,7 +15,37 @@ import scipy.stats as ss
 # alignment module
 """
 alignmnet module
+20170718:
+modified for foldojo usage
 """
+def IUPAC_codec(it):
+    """
+    give a list or string of letters return code.
+    """
+    seq=set(it)
+    assert seq<=set('ATGCUWSMKRYBDHVN-'),('{} not in IUPAC codes.'.format(seq-set('ATGCUWSMKRYBDHVN-')))
+    if len(seq)==1:
+        return list(it)[0]
+    elif seq==set('AT'):return 'W'
+    elif seq==set('CG'):return 'S'
+    elif seq==set('AC'): return "M"
+    elif seq==set('GT'): return "K"
+    elif seq==set('AG'): return "R"
+    elif seq==set('CT'): return "Y"
+    elif seq==set('CGT'): return "B"
+    elif seq==set('AGT'): return "D"
+    elif seq==set('ACT'): return "H"
+    elif seq==set('ACG'): return "V"
+    elif seq==set('ATCG'): return "N"
+    else:
+        return IUPAC_codec(seq-set('-')).lower()
+
+def IUPAC_decode(i):
+    assert str(i) in 'ATGCUWSMKRYBDHVN',('{} is not a IUPAC abbrv.'.format(i))
+    code={'W':'AT','S':'CG','K':'GT','M':'AC','Y':'CT','R':'AG','V':'ACG','H':'ACT','D':'AGT','B':'CGT','N':'ATCG'}
+    return code.get(i,i)
+
+
 ####################################
 def lev_distance(s1,s2,threshold=1000):
     """
@@ -153,7 +183,7 @@ class Alignment():
                         counter=c
         return (seq, count, offset), (seq_, count_, offset_)
 
-    def format(self, id=False, count=False, offset=False, collapse=0,order=False):
+    def format(self, id=False, count=False, offset=False, collapse=0,order=False,index=False,link=False):
         """
         option to show ID or Count number or Offset
         collapse will collapse sequence with a hamming distance < given number.
@@ -175,7 +205,35 @@ class Alignment():
         counts.extend(down[1])
         if order:
             _string1 = [i for _,i in sorted(zip(counts,_string1),reverse=True)]
-        return '\n'.join(_string1)+'\n'
+        if link and len(self.seq)>1:
+            linkers=[]
+            for i in range(len(_string1)-1):
+                linker=''
+                for i,j in zip(_string1[i],_string1[i+1]):
+                    if i==j:
+                        linker+='&nbsp'
+                    else:
+                        linker+='*'
+                linkers.append(linker)
+            _string1 = [i for p in zip(_string1,linkers) for i in p]+_string1[-1:]
+
+
+        # indexing
+        if index:
+            length = len(self)
+            digits = int(np.log10(length))+1
+            index = ['']*digits
+            for i in range(1,length+1):
+                for j in range(digits):
+                    if i % (5) ==0:
+                        index[j]+=str(i//(10**(digits-1-j)))[-1]
+                    else:
+                        index[j]+='-'
+            return '\n'.join(index+_string1)
+        else:
+            return '\n'.join(_string1)
+
+
 
     def __len__(self):
         return len(self.freq)
@@ -196,6 +254,13 @@ class Alignment():
             index = np.argmax(i)
             s += m[index]
         return s
+
+    def iupac(self):
+        result=''
+        for i in zip(*self.seq):
+            result+=IUPAC_codec(i)
+        return result
+
 
     def _freq(self, count=True):
         a = self.freq if count else self.freq_calc(self.seq)
@@ -656,7 +721,7 @@ class Alignment():
             plt.tight_layout()
             save = save if isinstance(
                 save, str) else str(self.name)+'_logo.svg'
-            plt.savefig(str(save))
+            plt.savefig(str(save),dpi=150)
         if show:
             plt.tight_layout()
             plt.show()
@@ -872,7 +937,9 @@ def buildMSA(sequence,name,**kwargs):
     gap=kwargs.get('gap',4)
     gapext=kwargs.get('gatext',2)
     offset=kwargs.get('offset',False)
-    sequence = sorted(sequence, key=len,reverse=True)
+    order=kwargs.get('order',True)
+    if order:
+        sequence = sorted(sequence, key=len,reverse=True)
     result=Alignment(sequence[0],name=name)
     for i in sequence[1:]:
         result=result.align(Alignment(i),name=name,offset=offset,gap=gap,gapext=gapext)

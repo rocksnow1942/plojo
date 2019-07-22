@@ -13,9 +13,6 @@ import matplotlib.pyplot as plt
 import matplotlib.collections as mpcollections
 
 # General tree-traversal algorithms
-def a():
-    pring(b)
-    
 
 
 

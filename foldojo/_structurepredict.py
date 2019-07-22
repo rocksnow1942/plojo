@@ -13,17 +13,40 @@ import matplotlib as mpl
 from matplotlib.text import TextPath
 from matplotlib.patches import PathPatch
 from matplotlib.font_manager import FontProperties
-from MSA import Alignment
+from MSA import Alignment,IUPAC_decode,poolwrapper
+import random
+import heapq
+import pandas as pd
+
+pd.options.display.max_colwidth = 500
+
+
+
+
+class lazyproperty():
+    def __init__(self,func):
+        self.func=func
+
+    def __get__(self,instance,cls):
+        if instance is None:
+            return self
+        else:
+            value=self.func(instance)
+            setattr(instance,self.func.__name__,value)
+            return value
+
 
 
 class Structure:
     """
     class wrapper around RNAstructure RNA class.
     then can fold and plot 2D structure.
+    all predicted data in _dot, _energy, _prob, _pairtuple
+    restricted data in dot, energy, prob, pairtuple
     """
-    def __init__(self,align=None,name=None,save_loc=None):
+    def __init__(self,align='',name=None,save_loc=None):
         self.align=align if isinstance(align,Alignment) else Alignment(align,name=name)
-        self.name=name or align.name
+        self.name=name or self.align.name
         self.foldpara={}
         if save_loc:self.save_loc=save_loc
 
@@ -44,9 +67,16 @@ class Structure:
         else:
             return path.join(savefolder,name)
 
-    @property
+    def __len__(self):
+        return len(self.align)
+
+    @lazyproperty
     def seq(self):
         return self.align.rep_seq()
+
+    @lazyproperty
+    def iupac(self):
+        return self.align.iupac()
 
     @property
     def seq_length(self):
@@ -59,9 +89,84 @@ class Structure:
         return len(self.dot)
 
     @property
-    def energy(self):
-        dot = getattr(self,'dot',None) or getattr(self,'_dot',[])
-        return [i[1] for i in dot]
+    def ratio(self):
+        """
+        ratio of different structures based on Boltzmann distribution
+        """
+        energy = np.array(self.energy)
+        if len(energy.shape)>1:energy = np.mean(energy,axis=1)
+        t=self.foldpara.get('SetTemperature',37)
+        t=t+273.15
+        kT=8.314*t/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
+        kT=np.exp(-1/kT)
+        return kT**(energy)/((kT**(energy)).sum())
+
+    @property
+    def _ratio(self):
+        """
+        ratio of different structures based on Boltzmann distribution
+        """
+        energy = np.array(self._energy)
+        if len(energy.shape)>1:energy = np.mean(energy,axis=1)
+        # kR=1.380649e-23*8.314/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
+        t=self.foldpara.get('SetTemperature',37)
+        t=t+273.15
+        kT=8.314*t/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
+        kT=np.exp(-1/kT)
+        return kT**(energy)/((kT**(energy)).sum())
+
+    def print(self,):
+        # &nbsp
+        # pd.options.display.max_colwidth = 500
+        result={'Predict':[],'Structure':[],'deltaG':[],'Ratio':[]}
+        seq=self.align.format(index=True).replace('\n','<br>')
+        result['Predict'].append('Sequence')
+        result['Structure'].append('##')
+        result['deltaG'].append('')
+        result['Ratio'].append('')
+        for i,(d,e,r) in enumerate(zip(self.dot[0:50],self.energy[0:50],self.ratio[0:50])):
+            result['Predict'].append('Predict '+str(i+1))
+            result['Structure'].append(d)
+            result['deltaG'].append(round(e,1))
+            result['Ratio'].append('{:.2e}'.format(r))
+        df = pd.DataFrame(result)
+        result=df.to_html(classes='table',index=False,justify='center',border=0).replace('\\n','<br>')
+        result=result.replace('##',seq)
+        return result
+
+
+
+    def remove(self,toremove):
+        """
+        ban a list of structures from folded structures.
+        """
+        nd,ne,np,npt=[],[],[],[]
+        for d,e,p,pt in zip(self._dot,self._energy,self._prob,self._pairtuple):
+            if d not in toremove:
+                nd.append(d)
+                ne.append(e)
+                np.append(p)
+                npt.append(pt)
+        self._dot,self._energy,self._prob,self._pairtuple=nd,ne,np,npt
+
+
+    def subtract(self,b,threshold,method='match',diffthreshold=4):
+        """
+        remove structures from another structure give a threshold.
+        threshold is how many fold the ratio of a give strucutre need to be lower in
+        b for i to be delted from self.
+        """
+        assert len(self)==len(b),('cannot substract different length structures')
+        judge = Structure_eq(method,int(diffthreshold))
+        toremove=[]
+        for d,r in zip(self._dot,self._ratio):
+            for d2,r2 in zip(b._dot,b._ratio):
+                if judge(d,d2):
+                    if r<=r2*threshold:
+                        print('removed:{}, r1:{} r2:{}'.format(d,r,r2))
+                        toremove.append(d)
+        self.remove(toremove)
+
 
     def fold(self,method='RNAstructure',percent=50,**kwargs):
         """
@@ -71,47 +176,83 @@ class Structure:
         self.foldpara.update(percent=percent,method=method)
         methods={'RNAstructure':self._RNAstructure_fold,'ViennaRNA':self._ViennaRNA_fold,
             'Compare_RV':self._compare_method}
-        self._dot,self._prob,self._pairtuple=methods[method](percent=percent,**kwargs)
+        self._dot,self._energy,self._prob,self._pairtuple=methods[method](percent=percent,**kwargs)
          # total suboptimal is the number before restricted by window size, but it is filtered by single pair.
         # self.restrict_fold(so,p,pt,window,maxstr,method)
+        assert len(self._dot)>0,('No structures can be folded.')
         return self
 
-    def restrict_fold(self,window,cluster='hamming',center='energy'):
+    def restrict_fold(self,window,cluster='hamming',center='energy',**kwargs):
         """
         restrict fold to certain ones.
         cluster : cluster method
         center :
         """
         self.foldpara.update(window=window)
-        so,p,pt=self._dot,self._prob,self._pairtuple
-        temp = dict(zip(so,zip(p,pt)))
-        self.dot=cluster_and_center(so,window,cluster=cluster,center=center)
+        so,p,pt,energy=self._dot,self._prob,self._pairtuple,self._energy
+        temp = dict(zip(so,zip(p,pt,energy)))
+        self.dot=cluster_and_center(list(zip(so,energy)),window,cluster=cluster,center=center)
         self.prob=[temp[i][0] for i in self.dot]
         self.pairtuple = [temp[i][1] for i in self.dot]
+        self.energy = [temp[i][2] for i in self.dot]
         return self
 
-    def init_dotgraph(self,maxstr=8):
+    def init_dotgraph(self,maxstr=8,repseq='iupac',**kwargs):
+        """
+        initialize dotgraph, notate by either Frequency  or IUPAC notation
+        """
+        if repseq=='frequency':
+            seq=self.seq
+        elif repseq=='iupac':
+            seq=self.iupac
+        else:
+            raise ValueError ('Wrong rep sequence code.')
 
         dot = self.dot[0:int(maxstr)]
-        self.dotgraph = [DotGraph(self.seq,*i,name=f"Predict {k+1}") for k,i in enumerate(zip(dot,self.prob,self.pairtuple))]
+        self.dotgraph = [DotGraph(seq,*i,name=f"Predict {k+1}") for k,i in enumerate(zip(dot,self.energy,self.prob,self.pairtuple,self.ratio))]
         return self
+
+    def plot_dot_bracket(self,dotbracket,seq=None,energy=0):
+        # self.totalsuboptimal = 1
+        # self.afterrestrictsuboptimal =1
+        if seq:
+            self.align=Alignment(seq)
+        else:
+            self.align = Alignment('N'*len(dotbracket))
+        self._dot=[dotbracket]
+        self._energy,self._prob,self._pairtuple=[energy],[[1]*len(dotbracket)],[dotbracket_to_tuple(dotbracket)]
 
     def _ViennaRNA_fold(self,percent,**kwargs):
         """
-        use ViennaRNA for prediction.
+        wrapper to handle aligment multiple sequence.
         """
         self.foldpara.update(kwargs)
+        if len(self.align.seq)==1:
+            return self._ViennaRNA_fold_(self.align.seq[0],percent,**kwargs)
+        sc=SPT_collector()
+        for i in self.align.seq:
+            sc.fill(*self._ViennaRNA_fold_(i,percent,**kwargs),i)
+            print('After {}, total structures = {}'.format(i,len(sc.data)))
+
+        # force save the alifold Algorithm result avoid collison in SPT collector.
+        sc.init(*self._ViennaRNA_fold_(self.align.seq,percent,**kwargs))
+
+        return sc.output()
+
+    def _ViennaRNA_fold_(self,sequence,percent,**kwargs):
+        """
+        use ViennaRNA for prediction.
+        """
         single=kwargs.get('ForceSingleStranded',None)
         double=kwargs.get('ForceDoubleStranded',None)
         pair=kwargs.get('ForcePair',None)
         temp=kwargs.get('SetTemperature',None)
         # adding constraints
         if temp:
-            ViennaRNA.cvar.temperature=temp-273.15
-            self.foldpara['SetTemperature']-=273.15
+            ViennaRNA.cvar.temperature=temp
+
         # create fold compound object
-        fc = ViennaRNA.fold_compound(self.seq)
-        ss,mfe=fc.mfe()
+        fc = ViennaRNA.fold_compound(sequence)
         if single:
             for i in single:
                 fc.hc_add_up(i,ViennaRNA.CONSTRAINT_CONTEXT_ALL_LOOPS)
@@ -121,16 +262,23 @@ class Structure:
         if pair:
             for i,j in pair:
                 fc.hc_add_bp(i, j, ViennaRNA.CONSTRAINT_CONTEXT_ALL_LOOPS | ViennaRNA.CONSTRAINT_CONTEXT_ENFORCE)
+
+        ss,mfe=fc.mfe()
         mferange=int(abs(mfe)*percent)
-        subopt=[(i.structure,round(i.energy,1)) for i in fc.subopt(mferange)]
-        subopt = filterlonelypair(subopt) # remove single pairs.
+        if isinstance(sequence,str):
+            subopt=[(i.structure,i.energy) for i in fc.subopt(mferange) if i.structure !=ss]
+        else:
+            subopt=[]
+        subopt = filterlonelypair(subopt)
+        subopt += [(ss,mfe)]
+         # remove single pairs.
         subopt.sort(key=lambda x:x[1])
         # callculate prob by Boltzmann sampling
         # create model details
         md = ViennaRNA.md()
         # activate unique multibranch loop decomposition
         md.uniq_ML = 1
-        fc = ViennaRNA.fold_compound(self.seq,md)
+        fc = ViennaRNA.fold_compound(sequence,md)
         # rescale Boltzmann factors according to MFE
         fc.exp_params_rescale(mfe)
         # compute partition function to fill DP matrices
@@ -144,9 +292,25 @@ class Structure:
         prob = ensemble_to_prob(ss)
         probs=[prob for i in range(len(subopt))]
         pairtuples = [dotbracket_to_tuple(i[0]) for i in subopt]
-        return subopt,probs,pairtuples
+        return [i[0] for i in subopt],[i[1] for i in subopt],probs,pairtuples
+
 
     def _RNAstructure_fold(self,percent,**kwargs):
+        """
+        wrapper to handle aligment multiple sequence.
+        """
+        self.foldpara.update(kwargs)
+        for i in self.align.seq:
+            assert set(i)<=set('ATCGU'), ('Nucleotide code {} is not supported in RNAstructure Algorithm.'.format(set(i)-set('ATCGU')))
+        if len(self.align.seq)==1:
+            return self._RNAstructure_fold_(self.align.seq[0],percent,**kwargs)
+        sc=SPT_collector()
+        for i in self.align.seq:
+            sc.fill(*self._RNAstructure_fold_(i,percent,**kwargs),i)
+        return sc.output()
+
+
+    def _RNAstructure_fold_(self,sequence,percent,**kwargs):
         """
         percent:  is the maximum % difference in free energy in suboptimal
         structures from the lowest free energy structure. The default is 20.
@@ -171,11 +335,10 @@ class Structure:
         ForceSingleStranded = i (nt to be single stranded)
         if no parameters passed, remove all constraints.
         """
-        self.foldpara.update(kwargs)
-        if self.foldpara.get('SetTemperature',None):
-            self.foldpara['SetTemperature']-=273.15 # to convert K to C in self. foldpara storage.
         backbone=kwargs.pop('backbone','rna')
-        p=RNA.fromString(self.seq,backbone)
+        p=RNA.fromString(sequence,backbone)
+        if kwargs.get('SetTemperature',None):
+            kwargs['SetTemperature']+=273.15 # to convert C to K.
         if kwargs:
             for k,i in kwargs.items():
                 if ("Force" in k) or ("SetTemp") in k:
@@ -193,6 +356,7 @@ class Structure:
         p.PartitionFunction()
         p.FoldSingleStrand(percent=percent,window=0,maximumstructures=10000)
         allstruct=[]
+        allenergy=[]
         probs=[]
         pairtuples=[]
         structurenumber=p.GetStructureNumber()
@@ -201,7 +365,7 @@ class Structure:
             dotbracket=''
             prob=[]
             pairtuple=[]
-            for j in range(1,self.seq_length+1):
+            for j in range(1,len(sequence)+1):
                 _=p.GetPair(j,i)
                 prob.append(p.GetPairProbability(j,_))
                 pairtuple.append((j,_))
@@ -212,9 +376,10 @@ class Structure:
                 else:
                     dotbracket+=')'
             pairtuples.append(pairtuple)
-            allstruct.append((dotbracket,energy))
+            allstruct.append(dotbracket)
+            allenergy.append(energy)
             probs.append(np.nan_to_num(np.array(prob)))
-        return allstruct,probs,pairtuples
+        return allstruct,allenergy,probs,pairtuples
 
     def _compare_method(self,percent,**kwargs):
         soV,pV,ptV=self._ViennaRNA_fold(percent,**kwargs)
@@ -227,24 +392,16 @@ class Structure:
         pt_c = [setV[i][2] for i in comS]
         return so_c,p_c,pt_c
 
-    def print(self):
-        s=self.seq
-        r=[]
-        for _,(i,j) in enumerate(self._dot):
-            r.append('Predict {} Energy = {}'.format(_+1,j))
-            r.append(s)
-            r.append(i)
-        return ('\n'.join(r))
 
-    def plot_fold(self,maxcol=100,save=False,**kwargs):
+    def plot_fold(self,maxcol=100,save=False,showpara=True,**kwargs):
         strutno=len(self.dotgraph)
         plot_size =max(self.dotgraph[0].plot_size())/200*4.5 # this is estimating size of each panel
         plot_size=max(plot_size,4)
-        panels=panel_count(strutno+1,maxcol)
+        panels=panel_count(strutno+showpara,maxcol)
         figwidth,figheight=(max(plot_size*panels[1],8),max(plot_size*panels[0],8))
         fig = plt.figure(figsize=(figwidth,figheight))
         # fig,axes = plt.subplots(*panels,figsize=(max(6*panels[1],8),max(6*panels[0],8)))
-        method=self.foldpara['method']
+        method=self.foldpara.get('method',None)
         N=self.totalsuboptimal
         M = self.afterrestrictsuboptimal
         if method=='Compare_RV': method='RNAstructure + ViennaRNA'
@@ -273,10 +430,11 @@ class Structure:
             dotgrap.plot_2d(ax=ax,maxprob=maxprob,**kwargs)
 
         # add prediction parameters to next axes
-        ax=axes[-1]
-        ax.set_axis_off()
-        text="Folding Parameter:\n"+'\n'.join(["{} : {}".format(k,str(i)) for k,i in self.foldpara.items()])
-        ax.text(0.01,0.85,text, transform=ax.transAxes, fontsize=max(int(3*plot_size),8),verticalalignment='top',family='monospace')
+        if showpara:
+            ax=axes[-1]
+            ax.set_axis_off()
+            text="Folding Parameter:\n"+'\n'.join(["{} : {}".format(k,str(i)) for k,i in self.foldpara.items()])
+            ax.text(0.01,0.85,text, transform=ax.transAxes, fontsize=max(int(3*plot_size),8),verticalalignment='top',family='monospace')
         if save:
             plotbackend=kwargs.get('plotbackend','.png')
             save = save if isinstance(save,str) else '2DP_'+self.name
@@ -285,6 +443,395 @@ class Structure:
         else:
             plt.show()
         return figheight,figwidth
+
+
+class MutableSequence():
+    def __init__(self,seed,target=None):
+        self.seed=seed
+        self.target=target or '.'*len(self.seed)
+        assert len(self.seed)==len(self.target) , ('Seed and target must be same length.')
+
+        self.pairtuple=dotbracket_to_tuple(self.target.replace('*','.'))
+
+    @lazyproperty
+    def totalmutation(self):
+        count=[]
+        s=self.seq_table
+        for i in self.seq_table:
+            if isinstance(i[0],int):
+                count.append((s[i[0]].count('T')+s[i[0]].count('G'))/len(s[i[0]])+1)
+            else:
+                count.append(len(i))
+        return int(np.prod(count))
+
+    @lazyproperty
+    def seq_table(self):
+        seq=list(map(list,map(IUPAC_decode,self.seed)))
+        for i,j in enumerate(self.pairtuple):
+            if 0<j[1]<j[0] and (len(seq[j[0]-1])+len(seq[j[1]-1])>2):
+                if len(seq[j[1]-1])>len(seq[j[0]-1]):
+                    seq[j[0]-1]=[j[1]-1]
+                else:
+                    seq[j[1]-1]=[j[0]-1]
+
+
+        return seq
+
+    def mut_iterator(self,n):
+        if n > 0.5*self.totalmutation:
+            for a in product(*self.seq_table):
+                yield from self.concate(a)
+        else:
+            yield from self.randomsampler(n)
+
+    def randomsampler(self,n):
+        result = set()
+        # count=0
+        while len(result)<n:
+            new=list(map(random.choice,self.seq_table))
+            for k,i in enumerate(new):
+                if isinstance(i,int):
+                    new[k]=random.choice(self.revcom(new[i]))
+            key=''.join(new)
+            if key not in result:
+                result.add(key)
+                yield key
+
+
+    def concate(self,a):
+        a=list(a)
+        for k,i in enumerate(a):
+            if isinstance(i,int):
+                a[k]=self.revcom(a[i])
+        for _ in product(*a):
+            yield ''.join(_)
+
+    def revcom(self,i):
+        c=dict(zip('ATCG','TAGC'))
+        c['T']+='G'
+        c['G']+='T'
+        return c[i]
+
+
+class SingleStructureDesign(MutableSequence):
+    def __init__(self,seed,target,**kwargs):
+        super().__init__(seed,target)
+        # self.foldpara={}
+
+    def generate(self,method,top=100,n=10000,**kwargs):
+        """
+        generate random sequence
+        """
+        # self.foldpara=kwargs
+        methods={'ViennaRNA':self._generate_Vienna,'RNAstructure':self._generate_RNAstructure}
+        if method not in methods.keys():
+            raise KeyError ('{} not in supported single strand design Algorithm'.format(method))
+        result=methods[method](n,top,**kwargs)
+        # result=sorted(result,key=lambda x:(-x[1],x[3]))
+        self.result=result
+        result=dict(zip(['Predict','Sequence','Ratio','MFE','TgtdG',],[list(range(1,1+len(result)))]+list(zip(*result))))
+        df=pd.DataFrame(result).loc[:,['Predict','Sequence','TgtdG','MFE','Ratio']]
+        df['TgtdG']=df['TgtdG'].map('{:.1f}'.format)
+        df['MFE']=df['MFE'].map('{:.1f}'.format)
+        df['Ratio']=df['Ratio'].map('{:.3f}'.format)
+        df['Predict']=df['Predict'].map('Predict {:>2}'.format)
+
+
+        # result=dict(zip(['Sequence','Ratio','MFE','TgtdG',],list(zip(*result))))
+        # df=pd.DataFrame(result).loc[:,['Sequence','TgtdG','MFE','Ratio']]
+        # df['TgtdG']=df['TgtdG'].map('{:.1f}'.format)
+        # df['MFE']=df['MFE'].map('{:.1f}'.format)
+        # df['Ratio']=df['Ratio'].map('{:.3f}'.format)
+        # df.index=['Predict '+str(i+1) for i in range(len(self.result))]
+        self.df=df
+        return df
+
+    def to_html(self):
+        result=self.df.to_html(classes='table',index=False,justify='center',border=0)#.replace('\\n','<br>')
+        return result
+
+    def _generate_Vienna_single(self,n,top,SetTemperature=37,**kwargs):
+        if '*' in self.target:
+            return self._generate_RNAstructure(n,top,SetTemperature=SetTemperature,_rnastru=False,**kwargs)
+        else:
+            t=SetTemperature#self.foldpara.get('SetTemperature',37)
+            ViennaRNA.cvar.temperature=t
+            t=t+273.15
+            kT=8.314*t/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
+            kT=np.exp(-1/kT)
+            result=Design_collector(top,lambda x:x[1])
+            for i in self.mut_iterator(n):
+                fc=ViennaRNA.fold_compound(i)
+                ss,mfe=fc.mfe()
+                ene=fc.eval_structure(self.target)
+                r = kT**ene/kT**mfe
+                result.add((i,r,mfe,ene))
+        return result.collect()
+
+    def _generate_Vienna(self,n,top,SetTemperature=37,**kwargs):
+        if '*' in self.target:
+            return self._generate_RNAstructure(n,top,SetTemperature=SetTemperature,_rnastru=False,**kwargs)
+        else:
+            t=SetTemperature#self.foldpara.get('SetTemperature',37)
+            ViennaRNA.cvar.temperature=t
+            t=t+273.15
+            kT=8.314*t/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
+            kT=np.exp(-1/kT)
+            result=Design_collector(top,lambda x:(x[1],-x[3]))
+            task = partial(self._ViennaRNA_task,kT=kT)
+            total = self.totalmutation if n > 0.5*self.totalmutation else n
+            tempresult = poolwrapper(task,self.mut_iterator(n),total=total,showprogress=True)
+            for i in tempresult:
+                result.add(i)
+        return result.collect()
+
+    def _ViennaRNA_task(self,seq,kT):
+        fc=ViennaRNA.fold_compound(seq)
+        ss,mfe=fc.mfe()
+        ene=fc.eval_structure(self.target)
+        r = kT**ene/kT**mfe
+        return (seq,r,mfe,ene)
+
+
+    def _generate_RNAstructure_single(self,n,top,SetTemperature=37,_rnastru=True,**kwargs):
+        if '*' in self.target:
+            judge = Structure_eq('starmatch')
+        else:
+            judge = Structure_eq(kwargs.get('strexc_method','match'),kwargs.get('strexc_threshold',None))
+        foldmethod = Structure._RNAstructure_fold_ if _rnastru else Structure._ViennaRNA_fold_
+        result=Design_collector(top,lambda x:(x[1],-x[3]))
+        temp=SetTemperature#self.foldpara.get('SetTemperature',37)
+        t=temp+273.15
+        kT=8.314*t/1e3
+        kT=np.exp(-1/kT)
+        for i in self.mut_iterator(n):
+            s,e,*_ = foldmethod(1,sequence=i,percent=int(kwargs.get('percent',50)),SetTemperature=temp)
+            e=np.array(e)
+            totalR = (kT**(e)).sum()
+            mfe=np.min(e)
+            ene_=[]
+            r_=[]
+            for si,ene in zip(s,e):
+                if judge(self.target,si):
+                    ene_.append(ene)
+                    r_.append(kT**ene/totalR)
+            if r_:
+                result.add((i, sum(r_) ,mfe,min(ene_)))
+        return result.collect()
+
+    def _generate_RNAstructure(self,n,top,SetTemperature=37,_rnastru=True,**kwargs):
+        """
+        multiprocessing version.
+        """
+        if '*' in self.target:
+            judge = Structure_eq('starmatch')
+        else:
+            judge = Structure_eq(kwargs.get('strexc_method','match'),kwargs.get('strexc_threshold',None))
+        foldmethod = Structure._RNAstructure_fold_ if _rnastru else Structure._ViennaRNA_fold_
+        result=Design_collector(top,lambda x:(x[1],-x[3]))
+        temp=SetTemperature#self.foldpara.get('SetTemperature',37)
+        t=temp+273.15
+        kT=8.314*t/1e3
+        kT=np.exp(-1/kT)
+        total = self.totalmutation if n > 0.5*self.totalmutation else n
+        task=partial(self._RNAstructure_task,judge=judge,foldmethod=foldmethod,percent=int(kwargs.get('percent',50)),temp=temp,kT=kT)
+        tempresult = poolwrapper(task,self.mut_iterator(n),total=total,showprogress=True)
+        for i in tempresult:
+            result.add(i)
+
+        return result.collect()
+
+
+    def _RNAstructure_task(self,seq,judge,foldmethod,percent,temp,kT):
+        """
+        multiprocessing task.
+        """
+        s,e,*_ = foldmethod(1,sequence=seq,percent=percent,SetTemperature=temp)
+        e=np.array(e)
+        totalR = (kT**(e)).sum()
+        mfe=np.min(e)
+        ene_=[]
+        r_=[]
+        for si,ene in zip(s,e):
+            if judge(self.target,si):
+                ene_.append(ene)
+                r_.append(kT**ene/totalR)
+        if r_:
+            return (seq, sum(r_) ,mfe,min(ene_))
+        else:
+            return None
+
+class StructurePerturbation(SingleStructureDesign):
+    def __init__(self,seed,target,n,mutrange=None,**kwargs):
+        self.seq=seed
+        self.target=target
+        self.n=n
+        assert len(seed)==len(target), ('Sequence and Structure must be of same length.')
+        assert n<=len(target), ('permutation sites must less than sequence length.')
+        totmut = list(range(len(seed)))
+        if mutrange is None:
+            self.mutable = totmut
+        else:
+            self.mutable=[]
+            for i in totmut:
+                for k,j in mutrange:
+                    if k>j: k,j=j,k
+                    if k<=i<=j:
+                        self.mutable.append(i)
+
+    @lazyproperty
+    def totalmutation(self):
+        n = len(self.seq)
+        m=self.n
+        c = 4**self.n
+        p = np.prod(range(n-m+1,n+1))/np.prod(range(1,m+1))
+        return int(p*c)
+
+    def mut_iterator(self,maxinteration):
+        if maxinteration>0.5*self.totalmutation:
+            for i in combinations(self.mutable,self.n):
+                seq=[[s] if k not in i else ['A','T','C','G'] for k,s in enumerate(self.seq)]
+                for l in product(*seq):
+                    yield ''.join(l)
+        else:
+            yield from self.randomsampler(maxinteration)
+
+    def randomsampler(self,maxiter):
+        result=set()
+        while len(result)<maxiter:
+            tomut = random.sample(self.mutable,self.n)
+            seq=[[s] if k not in tomut else ['A','T','C','G'] for k,s in enumerate(self.seq)]
+            new=list(map(random.choice,seq))
+            key=''.join(new)
+            if key not in result:
+                result.add(key)
+                yield key
+
+    def generate(self,iteration,goal='inhibit',SetTemperature=37,**kwargs):
+        t=SetTemperature#self.foldpara.get('SetTemperature',37)
+        ViennaRNA.cvar.temperature=t
+        t=t+273.15
+        kT=8.314*t/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
+        kT=np.exp(-1/kT)
+        if goal=='inhibit':
+            sorter = lambda x:(x[3],-x[1])
+        else:
+            sorter = lambda x:(-x[3],x[1])
+        result=Design_collector(50,sorter)
+        task = partial(self._ViennaRNA_task,kT=kT) # return (seq,ratio, mfe, energy)
+        total = self.totalmutation if iteration > 0.5*self.totalmutation else iteration
+        tempresult = poolwrapper(task,self.mut_iterator(iteration),total=total,showprogress=True)
+        for i in tempresult:
+            result.add(i)
+        self.result=result.collect()
+        original = self._ViennaRNA_task(self.seq,kT)
+        result = [original] + self.result
+        result=dict(zip(['Predict','Sequence','Ratio','MFE','TgtdG',],[list(range(len(result)))]+list(zip(*result))))
+        df=pd.DataFrame(result).loc[:,['Predict','Sequence','TgtdG','MFE','Ratio']]
+        df['TgtdG']=df['TgtdG'].map('{:.1f}'.format)
+        df['MFE']=df['MFE'].map('{:.1f}'.format)
+        df['Ratio']=df['Ratio'].map('{:.3f}'.format)
+        df['Predict']=df['Predict'].map('Predict {:>2}'.format)
+        df.iloc[0,0]='Original'
+        self.df=df
+        return df
+
+
+class TowMutableSequence():
+    pass
+
+
+class TwoStructureDesign:
+    def __init__(self,s1,s2,t1,t2):
+        pass
+
+
+
+
+
+
+
+
+
+
+class SPT_collector():
+    """
+    container class for dotbracket, probability and tuples
+    """
+    def __init__(self):
+        self.data={}
+        self.initiated=False
+
+    def init(self,s,_e,p,t):
+        self.initiated=True
+        if not isinstance(s,list):
+            s,_e,p,t=[s],[_e],[p],[t]
+        for d,e,_p,_t in zip(s,_e,p,t):
+            if d not in self.data:
+                self.data[d]=[e,_p,_t,1]
+            else:
+                self.add(d,e,_p,_t)
+
+    def fill(self,s,e,p,t,seq):
+        if self.data or self.initiated:
+            self.intersect(s,e,p,t,seq)
+        else:
+            self.init(s,e,p,t)
+
+    def seq_str_eq(self,seq,s1,s2):
+        for n,s,t in zip(seq,s1,s2):
+            if n=='-':
+                continue
+            else:
+                if s!=t:
+                    return False
+        return True
+
+    def intersect(self,s,_e,p,t,seq):
+        if not isinstance(s,list):
+            s,_e,p,t=[s],[_e],[p],[t]
+        suboptlist=s
+        self.data={i:j for i,j in self.data.items() if i in suboptlist}
+        new = {}
+        for d,e,_p,_t in zip(s,_e,p,t):
+            for k in self.data:
+                if self.seq_str_eq(seq,d,k):
+                    pe,p_p,_t,count=self.data[k]
+                    new[k]=[(pe*count+e)/(count+1),(p_p*count+_p)/(count+1),_t,count+1]
+        self.data=new
+
+    def add(self,d,e,_p,_t):
+        pe,p_p,_t,count=self.data[d]
+        self.data[d]=[(pe*count+e)/(count+1),(p_p*count+_p)/(count+1),_t,count+1]
+
+    def output(self):
+        s=[k for k,i in self.data.items()]
+        e=[i[0] for k,i in self.data.items()]
+        p=[i[1] for k,i in self.data.items()]
+        t=[i[2] for k,i in self.data.items()]
+        return s,e,p,t
+
+class Design_collector():
+    def __init__(self,limit=100,func=None):
+        self.limit=limit
+        self.func=func
+        self.data=[]
+        self.edge=None
+
+    def add(self,entry):
+        if entry is None:
+            return 0
+        func=self.func
+        if (self.edge is None) or (func(entry) >= self.edge):
+            self.edge = func(entry)
+            heapq.heappush(self.data,(self.edge,entry))
+        if len(self.data)>self.limit:
+            heapq.heappop(self.data)
+
+    def collect(self):
+        a=[heapq.heappop(self.data) for i in range(len(self.data))]
+        a.reverse()
+        return [i[1] for i in a]
 
 
 class DotGraphConstructor:
@@ -903,11 +1450,11 @@ class DotGraph(DotGraphConstructor):
     f: five-prime unpaired
     t: three-prime unpaired
     """
-    def __init__(self,seq,dot,prob,pairtuple,name=None):
+    def __init__(self,seq,dot,energy,prob,pairtuple,ratio=0,name=None):
         self.seq=seq
         self.prob=prob
-        self.dot=dot[0]
-        self.energy=dot[1]
+        self.dot=dot
+        self.energy=energy
         # self.pairtuple=pairtuples
         self.defines={}
         self.edges=defaultdict(set)
@@ -915,6 +1462,7 @@ class DotGraph(DotGraphConstructor):
         self._name_counter=0
         self.pairtuple=pairtuple
         self.name=name
+        self.ratio=ratio
         self.from_tuples(pairtuple)
 
     @property
@@ -1153,7 +1701,7 @@ class DotGraph(DotGraphConstructor):
         #            "-":TextPath( (-2, -2.1), "-", size=6, prop=fp),
         #            }
         vocal="ATGCUWSMKRYBDHVN"
-        LETTERS = {i:TextPath( (-2, -2), i, size=6, prop=fp ) for i in vocal+vocal.lower()+'-'}
+        LETTERS = {i:TextPath( (-2, -2), i.upper(), size=6, prop=fp ) for i in vocal+vocal.lower()+'-'}
         def default():
             return 'black'
         ntcolor=defaultdict(default)
@@ -1161,7 +1709,7 @@ class DotGraph(DotGraphConstructor):
         for i, coord in enumerate(coords):
             nucleotide=self.seq[i]
             circle = plt.Circle((coord[0], coord[1]),
-                                edgecolor='black', radius=2.85,facecolor=ntcolor[nucleotide.upper()])#"white"
+                                edgecolor='black', radius=2.85,facecolor=ntcolor[nucleotide])#"white"
             ax.add_artist(circle)
             txtkwargs={"fontweight":"bold","fontsize":6}
             txtkwargs.update(text_kwargs)
@@ -1204,13 +1752,44 @@ class DotGraph(DotGraphConstructor):
         # width = datalim[1][0] - datalim[0][0]
         # height = datalim[1][1] - datalim[0][1]
         # print(width,height)
-        ax.set_title(f"{self.name}, dG = {self.energy}")
+        energy = "({:.1f},{:.1f})".format(*self.energy) if isinstance(self.energy,tuple) else round(self.energy,1)
+        ax.set_title("{}, dG={}, R={:.2e}".format(self.name,energy,self.ratio))
         ax.set_aspect('equal', 'datalim')
         ax.update_datalim(datalim)
         ax.autoscale_view()
         ax.set_axis_off()
 
+class Structure_eq():
+    def __init__(self,method,threshold=None):
+        self.method=method
+        self.threshold=threshold
 
+    def __call__(self,*args):
+        return getattr(self,self.method)(*args)
+
+    def match(self,a,b):
+        return a==b
+
+    def starmatch(self,a,b):
+        for i,j in zip(a,b):
+            if i!=j and i !='*' and j !='*':
+                return False
+        return True
+
+    def hamming(self,s1,s2):
+        return sum([i!=j for i,j in zip(s1,s2)]) <= self.threshold
+
+    def tree(self,s1,s2):
+        xstruc = ViennaRNA.expand_Full(s1)
+        T1 = ViennaRNA.make_tree(xstruc)
+        xstruc = ViennaRNA.expand_Full(s2)
+        T2 = ViennaRNA.make_tree(xstruc)
+        ViennaRNA.edit_backtrack = 1
+        tree_dist = ViennaRNA.tree_edit_distance(T1, T2)
+        return tree_dist<=self.threshold
+
+    def basepair(self,s1,s2):
+        return ViennaRNA.bp_distance(s1,s2) <= self.threshold
 
 
 def any_difference_of_one(stem, bulge):
@@ -1303,7 +1882,6 @@ def scalar_to_rgb(scalar,map):
     cNorm  = colors.Normalize(vmin=np.min(scalar), vmax=np.max(scalar))
     scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
     return scalarMap.to_rgba
-
 
 
 
@@ -1541,13 +2119,13 @@ def kdistance(s1,s2):
 
 def cluster_and_center(list_of_seq, distance,cluster='hamming',center='energy'):
     if not distance:
-        return list_of_seq
+        list_of_seq.sort(key=lambda x:x[1])
+        return [i[0] for i in list_of_seq]
     methods={'hamming':kdistance,'tree':tree_edit_distance,'basepair':basepair_distance}
     function = methods[cluster]
     result_key = [list_of_seq[0][0]]
     result = {list_of_seq[0][0]: []}
     for k,(i,e) in (enumerate(list_of_seq)):
-
         temp = i
         discalc=partial(function,s2=i)
         distlist = list(map(discalc,result_key))
@@ -1559,16 +2137,18 @@ def cluster_and_center(list_of_seq, distance,cluster='hamming',center='energy'):
         else:
             result[temp].append((i,e))
 
-    result=[ findcenter(j,method=center) for i,j in result.items()]
+    result=[ findcenter(j,method=center,clustermethod=cluster) for i,j in result.items()]
     result.sort(key=lambda x:x[1])
-    return result
+    return [i[0] for i in result]
 
 
-def findcenter(listofseq,method='energy'):
+def findcenter(listofseq,method,clustermethod):
+    methods={'hamming':kdistance,'tree':tree_edit_distance,'basepair':basepair_distance}
+    func = methods.get(clustermethod,'hamming')
     if method=='distance':
         distance = dict.fromkeys(listofseq,0)
         for i,j in combinations(listofseq,2):
-            dis=kdistance(i[0],j[0])
+            dis=func(i[0],j[0])
             distance[i]+=dis
             distance[j]+=dis
         return min(distance.items(),key=lambda x:x[1])[0]
@@ -1591,7 +2171,7 @@ def tree_edit_distance(s1,s2,):
     T1 = ViennaRNA.make_tree(xstruc)
     xstruc = ViennaRNA.expand_Full(s2)
     T2 = ViennaRNA.make_tree(xstruc)
-    RNA.edit_backtrack = 1
+    ViennaRNA.edit_backtrack = 1
     tree_dist = ViennaRNA.tree_edit_distance(T1, T2)
     return tree_dist
 

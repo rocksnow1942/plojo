@@ -2,26 +2,34 @@ import os,glob
 from os import path
 # import shelve
 # from bokeh.models import HoverTool,Slider,RangeSlider
-from bokeh.models.widgets import Button, TextInput,Div,TextAreaInput,Select,Dropdown
-from bokeh.layouts import widgetbox,column,row
+from bokeh.models.widgets import Button, TextInput,Div,TextAreaInput,Select,Dropdown, CheckboxGroup,PreText,Tabs,Panel
+from bokeh.layouts import widgetbox,column,row,layout
 # import numpy as np
 # from simu_utils import file_save_location,file_name
-from _structurepredict import Structure
+from _structurepredict import Structure,SingleStructureDesign,StructurePerturbation
 import datetime
 from MSA import Alignment, buildMSA
 
 cache_loc=path.join(path.dirname(__file__),'static','cache')
 
+
+"""
+known bug:
+
+"""
+
+
+
 class structure_prediction():
     def __init__(self):
         #parameters default
-        self.default = ['rna','37','50','1','8']+['None']*6
         width=125
         buttonwidth=100
 
         # define gadgets
         #inputs
-        self.sequence =TextAreaInput(title="Enter Sequence:",value='ACCCTTGCTTGCGTAGCATTTTACCAGTGAGTCGGATCTCCGCATATCTGCG',rows=5,cols=145,max_length=5000,width=1000)
+        self.sequence =TextAreaInput(title="Enter Sequence:",value='ACCCTTGCTTGCGTAGCATTTTACCAGTGAGTCGGATCTCCGCATATCTGCG',
+                            rows=7,cols=145,max_length=5000,width=1000,css_classes=['custom1'])
         self.name=TextInput(title='Sequence Name',value='NewSequence',width=width)
         self.inputa_backbone =Select(title='Backbone type:',value='rna',options=[('rna','RNA'),('dna','DNA')],width=width)
         self.inputb_SetTemperature = TextInput(title='Set Temperature (C):',value='37',width=width)
@@ -32,30 +40,79 @@ class structure_prediction():
         self.inputg_ForceDoubleStranded = TextInput(title='Force Double Strand',value='None',width=width)
         self.inputh_ForcePair = TextInput(title='Force Pair',value='None',width=width)
         self.inputi_ForceProhibitPair = TextInput(title='Force No Pair',value='None',width=width)
-        # self.inputj_ForceModification = TextInput(title='Modification Site',value='None',width=width)
-        # self.inputk_ForceFMNCleavage = TextInput(title='FMN Cleavage',value='None',width=width)
         self.method = Select(title='Prediction Algorithm',value='RNAstructure',width=width,
                                     options=[('RNAstructure','RNAstructure'),('ViennaRNA','ViennaRNA'),('Compare_RV','Compare RS and VR')])
         self.parainputs = [i for k,i in sorted(self.__dict__.items(),key=lambda x:x[0]) if k.startswith('input')]
 
+        # align parameters
+        self.align_gap = TextInput(title='Align Gap Penalty',value='4',width=width)
+        self.align_gapext = TextInput(title='Align GapExt Penalty',value='2',width=width)
+        self.align_options = CheckboxGroup(labels=["Align Offset", 'Sequence Order'], active=[1])
+        self.align_widget = widgetbox(self.align_gap,self.align_gapext,self.align_options)
+
+        # fold parameters
+        self.fold_cluster = Select(title='Structure Filter Method',value='hamming',options=[('hamming','Hamming Distance'),('basepair','Base Pair Distance'),('tree','Tree Edit Distance')],width=150)
+        self.fold_center = Select(title='Structure Pick Method',value='energy',options=[('energy','Lowest Energy'),('distance','Distance Centroid')],width=150)
+        self.fold_widget = widgetbox(self.fold_cluster,self.fold_center)
+        self.default_mode_para = row(self.align_widget,self.fold_widget)
+        self.para_settings = column(PreText(text='Default Mode Parameter Settings'),self.default_mode_para)
+
+        # plot mode
+        self.plot_mode_energy = TextInput(title='Enter Energy Value',value='-1',width=180)
+
+        # structure exclusion parameters
+        self.strexc_threshold = TextInput(title='Exclude structure threshold',value='10',width=180)
+        self.strexc_method = Select(title='Structure Match Method',value='match',options=[('match','Exact Match'),
+                        ('hamming','Hamming Distance'),('basepair','Base Pair Distance'),('tree','Tree Edit Distance'),('starmatch','Star Match')],width=180)
+        self.strexc_strthreshold =  TextInput(title='Structure Match Threshold',value='4',width=180)
+        self.strexc_mode_para = widgetbox(self.strexc_threshold,self.strexc_method,self.strexc_strthreshold)
+
+        # perturbation mode parameters
+        perturb_mode_explain="""<h2>Structure Perturbation</h2>
+        <p>Mutate a number of sites concurrently and promote or inhibit a target structure.</p>
+        <p>Use ViennaRNA Algorithm only.</p>
+        """
+        self.perturb_mode_explain = Div(text=perturb_mode_explain,width=700,height=100)
+        self.perturb_range = TextInput(title='Mutation Region:',value='ALL',width=180)
+        self.perturb_n = TextInput(title='Total Mutation Sites:',value='1',width=180)
+        self.perturb_iteration = TextInput(title='Maximum Iterations:',value='1000',width=180)
+        self.perturb_goal = Select(title="Perturbation Goal",value='inhibit',options=[('inhibit',"Inhibit Target Structure"),('promote',"Promote Target Structure")])
+        self.perturb_mode_para=widgetbox(self.perturb_goal,self.perturb_range,self.perturb_n,self.perturb_iteration)
+
+
+        # single strand parameters
+        sgl_nexplaintext = """<h2>Single Strand Design</h2>
+        <p>Enter IUPAC notation sequence and target structure. Then predict.</p>
+        <p>Use ViennaRNA Algorithm is much faster than RNAstructure.</p>
+        <p> <b>*</b> is allowed to match any structure. However, This will drastically slow down prediction.</p>
+        <h3>IUPAC notation:</h3>
+        <p> W=AT S=CG M=AC K=GT R=AG Y=CT B=CGT D=AGT H=ACT V=ACG N=AGCT</p>
+        """
+        self.sgld_n = TextInput(title='Maximum Iterations:',value='10',width=180)
+        self.sgld_top = TextInput(title='Show Top:',value='50',width=180)
+        self.sgl_nexplain = Div(text=sgl_nexplaintext,width=700,height=200)
+        self.sgld_mdoe_para =widgetbox(self.sgld_n, self.sgld_top,self.strexc_method,self.strexc_strthreshold)
+
 
         # action buttons
-        self.predict = Button(label=chr(9193)+' Predict ',button_type='success',width=buttonwidth)
-        self.tools = Dropdown(label=chr(127922)+' Tools ',button_type='success',width=buttonwidth,
-                            value=None,menu = [('Reset','reset'),None,('',''),('','')])
-        self.align = Button(label = chr(128260)+ ' Align',button_type='success',width=buttonwidth)
-        self.settings = Dropdown(label=chr(128295)+' Settings', button_type='success',value='.png',
-                                    menu = [('As PNG','.png'),('As SVG','.svg'),None,('Parameters','para')('Help','help')],width=buttonwidth)
+        self.predict = Button(label=chr(9193)+' Predict ',button_type='success',width=buttonwidth,css_classes=['button'])
+        self.tools = Dropdown(label=chr(127922)+' Tools ',button_type='success',width=buttonwidth,css_classes=['button'],
+        value=None,menu = [('Draw Structure','plot'),None,('Default mode','default'),('Structure Exclusion','exclusion'),('Single Strand Design','single'),
+        ('2 Strand Design','double'),('Structure Perturbation','perturb'),None,('Co-Fold','cofold'),('Reset Parameter','reset')])
+        self.align = Button(label = chr(128260)+ ' Align',button_type='success',width=buttonwidth,css_classes=['button'])
+        self.settings = Dropdown(label=chr(128295)+' Settings', button_type='success',value='.png',css_classes=['button'],
+                                    menu = [('As PNG','.png'),('As SVG','.svg'),None,('Help','help')],width=buttonwidth)
 
 
         # misc
-        self.plot = Div(text="",width=800,height=900)
-        bottom= Div(text="""
-        <p align='center'><a href='http://www.aptitudemedical.com'>Aptitude Medical Systems, Inc.<a></p>
-        """,width=800,height=50)
-        self.div=Div(width=50)
-        self.div1=Div(width=50)
-        self.div2=Div(width=50)
+        self.header= Div(text=header.default,width=1000,height=40,css_classes=['custom1'])
+        self.plot = Div(text=helptext,width=800,height=900)
+        self.text = Div(text='',width=800,height=900)
+        self.plottab = Tabs(active=0,width=810,height=930,tabs=[Panel(child=self.plot,title='Output1'),Panel(child=self.text,title='Output2'),
+                Panel(child=self.para_settings,title="Parameters")])
+        self.div=Div(width=50,css_classes=['divider'])
+        self.div1=Div(width=50,css_classes=['divider'])
+        self.div2=Div(width=50,css_classes=['divider'])
 
 
         # add callbacks
@@ -66,44 +123,79 @@ class structure_prediction():
         self.align.on_click(self.align_cb)
 
         # layouts
-        self.layout=([self.sequence],[widgetbox(self.name,self.method,*self.parainputs),column(row(self.predict,self.div,self.align,self.div2,self.tools,self.div1,self.settings),self.plot)],[bottom])
+        self.layout=layout([self.header],[self.sequence],[widgetbox(self.name,self.method,*self.parainputs,css_classes=['widgetbox']),
+                    column(row(self.predict,self.div,self.align,self.div1,self.tools,self.div2,self.settings),self.plottab,css_classes=['plotarea'])],)
+
 
         # status attributes
-        self.status=0
-        self.plotbackendstatus='.png'
+        self.tool_mode='default'
+        self.fold_status={}
+        self.last_predict=''
+        self.align_status={}
+        self.align=Alignment()
+        self.showingplot=True
+        self.plotbackend = '.png'
+
 
     def align_cb(self):
         name=self.name.value
-        backend=self.settings.value
+        backend=self.plotbackend
+        mode = self.tool_mode
+        if backend=='dot': backend='.png'
         try:
-            sequence=self.parsesequence(self.sequence.value)
+            self.clear_cache()
+            gap=int(self.align_gap.value)
+            gapext=int(self.align_gapext.value)
+            offset=0 in self.align_options.active
+            order=1 in self.align_options.active
+            para = dict(gap=gap,gapext=gapext,offset=offset,order=order)
+            sequence=self.parsesequence()
+            if mode == 'default':
+                if set(sequence)==set(self.align.seq) and para==self.align_status:
+                    self.align.name = name
+                else:
 
-            align = buildMSA(sequence,name=name)
-            self.sequence.value=align.format()
-            savename= name +'_LOGO_'+ datetime.datetime.now().strftime("%m%d_%H%M%S") + backend
-            save = path.join(cache_loc,savename)
+                    self.align = buildMSA(sequence,name=name,**para)
 
-            align.dna_logo(save=save,show=False)
+                    self.align_status=para
+                self.sequence.value=self.align.format()
+                savename= name +'_LOGO_'+ datetime.datetime.now().strftime("%m%d_%H%M%S") + backend
+                save = path.join(cache_loc,savename)
 
-            self.plot.text="""
-            <h3>Alignment:</h3>
-            <p style= "font-family:monospace">{}</p>
-            <img src="foldojo/static/cache/{}"  hspace='20' height='200' width='700'>
-            """.format(align.format().replace('\n','</br>'),savename)
+                self.align.dna_logo(save=save,show=False)
+
+                self.plot.text="""
+                <h3>Alignment:</h3>
+                <p style= "font-family:monospace">{}</p>
+                <img src="foldojo/static/cache/{}"  hspace='20' height='200' width='700'>
+                """.format(self.align.format(index=True,link=True).replace('\n','</br>'),savename)
+            elif mode == 'exclusion':
+                seq1,seq2=sequence
+                ali1 = buildMSA(seq1,name=name,**para)
+                ali2 = buildMSA(seq2,name=name,**para)
+                ali1s,ali2s=ali1.format(),ali2.format()
+                self.sequence.value=ali1s+'\n/\n'+ali2s
+                ali1l,ali2l = list(zip(*ali1s.split('\n'))), list(zip(*ali2s.split('\n')))
+                linker=''
+                for i,j in zip(ali1l,ali2l):
+                    if set(i)==set(j):
+                        linker+='|'
+                    else:
+                        linker+='*'
+                self.plot.text="""
+                <h3>Alignment</h3>
+                <p style= "font-family:monospace">{}<br>{}<br>{}</p>
+                """.format(ali1.format(index=True).replace('\n','</br>'),linker,ali2.format().replace('\n','</br>'))
 
         except Exception as e:
             self.plot.text=str(e)
 
-
     def settings_cb(self,attr,old,new):
-        if new in ['.png','.svg']:
+        if new in ['.png','.svg','dot']:
+            self.plotbackend = new
             return 0
         elif new =='help':
             self.plot.text=helptext
-        elif new == 'para':
-            # switch to para adjustement interface.
-            pass
-
         self.settings.value=old
 
     def viennainputtoggle(self,onoroff):
@@ -124,44 +216,112 @@ class structure_prediction():
         if new=='none':
             return 0
         elif new == 'reset':
-            for i,j in zip(self.default,self.parainputs):
-                j.value=i
+            self.fold_status={}
             self.name.value='NewSequence'
             self.plot.text="<h2>Parameters reset.</h2>"
-            self.predict.disabled=False
-            self.predict.button_type='success'
+            self.align_gap.value='4'
+            self.align_gapext.value='2'
+            self.align_options.active=[1]
+            self.fold_cluster.value='hamming'
+            self.fold_center.value='energy'
+        else:
+            self.header.text=getattr(header,new)
+            self.tool_mode=new
+            self.change_parameter(new)
         self.tools.value='none'
 
-    def parsesequence(self,seq):
+    def change_parameter(self,mode):
+        if mode == 'default':
+            self.para_settings.children = [PreText(text='Default Mode Parameter Settings'),self.default_mode_para]
+            if not self.fold_status:self.sequence.value = 'ACCCTTGCTTGCGTAGCATTTTACCAGTGAGTCGGATCTCCGCATATCTGCG'
+
+        elif mode == 'plot':
+            self.para_settings.children = [Div(text="<h2>Nothing To Set Here.</h2>"),self.plot_mode_energy]
+            if not self.fold_status:self.sequence.value = 'WANTSUBWAYHAMBURGRSTHURSDAYWHACKYSHMUCHYUK\n((((((..((((....))))..((((....))))..))))))'
+
+
+        elif mode == 'exclusion':
+            self.para_settings.children = [PreText(text='Structure Exclusion Mode Parameter Settings'),self.strexc_mode_para]
+            if not self.fold_status:self.sequence.value = 'ACCCTTGCTTGCGTAGCATTTTACCAGTGAGTCGGATCTCCGCATATCTGCG\n/\nACCCTTGCTTGCGTAGCATTTTGCCAGTGAGTCGGATCTCCGCATATCACGC'
+
+        elif mode == 'single':
+            self.method.value='ViennaRNA'
+            self.para_settings.children = [self.sgl_nexplain,self.sgld_mdoe_para]
+            if not self.fold_status:self.sequence.value = 'SWRNATATNYWS\n(((......)))'
+
+        elif mode == 'perturb':
+            self.method.value='ViennaRNA'
+            self.para_settings.children = [self.perturb_mode_explain,self.perturb_mode_para]
+            if not self.fold_status:self.sequence.value = 'ACCCTTGCTTGCGTAGCATTTTACCAGTGAGTCGGATCTCCGCATATCTGCG\n......(((.(((........))).)))(((......)))((((....))))'
+
+
+    def _sequence_cleaner(self,seq):
         seq = seq.strip().split('\n')
         result=[]
         for i in seq:
-            temp=''.join([j.upper() for j in i if j in "ATGCUWSMKRYBDHVN-" ])
+            temp=''.join([j.upper() for j in i if j in "ATGCUWSMKRYBDHVN-(.)*" ])
             if temp:
                 result.append(temp)
         return result
 
+    def parsesequence(self,*args):
+        mode =self.tool_mode
+        seq = self.sequence.value
+
+        if mode in ['default','plot']:
+            return self._sequence_cleaner(seq)
+        elif mode == 'exclusion':
+            seq1,seq2 = seq.strip().split('/')
+            seq1,seq2=self._sequence_cleaner(seq1),self._sequence_cleaner(seq2)
+            return seq1,seq2
+        elif mode in ['single','perturb',]:
+            r = self._sequence_cleaner(seq)
+            assert len(r)==2,('Must enter two row.')
+            assert set(r[1])<=set("(.*)"),('Wrong structure format.')
+            return r
+
+
     def parsepara(self):
+        mode =self.tool_mode
         para={'method':self.method.value}
-        for k,i in filter(lambda x:x[0].startswith('input'),self.__dict__.items()):
-            key=k.split('_')[1]
-            value=i.value.strip()
-            if 'Force' in key:
-                if value == 'None' or (not value):
-                    continue
-                elif '-' in value:
-                    _v=[(int(i.split('-')[0]),int(i.split('-')[1])) for i in value.split(',')]
+        if mode in ['default','exclusion','single','perturb']:
+            para.update(cluster=self.fold_cluster.value,center=self.fold_center.value)
+            for k,i in filter(lambda x:x[0].startswith('input'),self.__dict__.items()):
+                key=k.split('_')[1]
+                value=i.value.strip()
+                if 'Force' in key:
+                    if value == 'None' or (not value):
+                        continue
+                    elif '-' in value:
+                        _v=[(int(i.split('-')[0]),int(i.split('-')[1])) for i in value.split(',')]
+                    else:
+                        _v=[int(i) for i in value.split(',')]
+                    para.update({key:_v})
+                elif key=='backbone':
+                    para.update(backbone=value)
+                elif key=='SetTemperature':
+                    para.update({key:float(value)})
                 else:
-                    _v=[int(i) for i in value.split(',')]
-                para.update({key:_v})
-            elif key=='backbone':
-                para.update(backbone=value)
-            elif key=='SetTemperature':
-                para.update({key:float(value)+273.15})
-            else:
-                para.update({key:float(value)})
+                    para.update({key:float(value)})
+
+            if mode == 'exclusion':
+                para.update(exclusion={'threshold':float(self.strexc_threshold.value),
+                            'method':self.strexc_method.value,'diffthreshold':int(self.strexc_strthreshold.value)})
+            if mode == 'single':
+                para.update(n=int(self.sgld_n.value),top=int(self.sgld_top.value),
+                            strexc_method=self.strexc_method.value,strexc_threshold=int(self.strexc_strthreshold.value))
+
+            if mode =='perturb':
+                mutrange = self.perturb_range.value
+                if '-' in mutrange:
+                    mutrange= [(int(i.split('-')[0]),int(i.split('-')[1])) for i in mutrange.split(',')]
+                else:
+                    mutrange=None
+                para.update(n=int(self.perturb_n.value),mutrange=mutrange,
+                        iteration=int(self.perturb_iteration.value),goal=self.perturb_goal.value)
 
         return para
+
 
     def clear_cache(self):
         file_list = sorted(glob.glob(path.join(cache_loc,'*')),key=lambda x: path.getmtime(x))
@@ -169,43 +329,102 @@ class structure_prediction():
             os.remove(file_list[0])
         return len(file_list)
 
+
     def predict_cb(self,):
         name=self.name.value
-        backend=self.settings.value
+        backend=self.plotbackend
+        mode=self.tool_mode
         try:
-            sequence=self.parsesequence(self.sequence.value)
-            self.sequence.value='\n'.join(sequence)
-            lengthlist=[len(i) for i in sequence]
-            assert max(lengthlist) == min(lengthlist), ('input sequence not same length')
+            self.clear_cache()
+            sequence=self.parsesequence()
+
+
             para=self.parsepara()
             ct=para.copy()
-            ct.update(sequence=sequence,name=name)
-            if ct == self.status and backend==self.plotbackendstatus:
+            ct.update(sequence=sequence,name=name,backend=backend,mode=mode)
+
+            if ct == self.fold_status:
+                self.plot.text="""
+                <img src="foldojo/static/cache/{}"  hspace='20' height='{:.0f}' width='{:.0f}'>
+                """.format(*self.last_predict)
                 return 0
 
-            align = Alignment(sequence,name=name)
+            # only creaet new structure if sequence and key parameters changed.
+            diff=[]
+            for k,i in ct.items():
+                if i != self.fold_status.get(k,None):
+                    diff.append(k)
+            plotnew = False
+            if set(diff)<=set(['window','name','cluster','center','maxstr']):
+                rna=self.structure
+                rna.name=name
+            else:
+                plotnew=True
 
-            self.status=ct
-            self.plotbackendstatus=backend
-            self.clear_cache()
-            save = name +'_'+ datetime.datetime.now().strftime("%m%d_%H%M%S")
-            print(para)
-            rna=Structure(align,name,save_loc=cache_loc)
-
+            #pop out unncessary parameters before pass to fold.
             window=para.pop('window',4)
             cluster = para.pop('cluster','hamming')
             center = para.pop('center','energy')
             maxstr = para.pop('maxstr',8)
 
-            rna.fold(**para)
+            if plotnew:
+                lengthlist=[len(i) for i in sequence]
+                if mode == 'default':
+                    assert max(lengthlist) == min(lengthlist), ('input sequence not same length')
+                    self.sequence.value='\n'.join(sequence)
+                    align = Alignment(sequence,name=name)
+                    rna=Structure(align,name,save_loc=cache_loc).fold(**para)
+                elif mode == 'plot':
+                    assert max(lengthlist) == min(lengthlist), ('input sequence not same length')
+                    self.sequence.value='\n'.join(sequence)
+                    ntseq=[]
+                    for i in sequence:
+                        if '.' in i or '(' in i:
+                            dotbracket = i
+                        else: ntseq.append(i)
+                    rna=Structure(name=name,save_loc=cache_loc)
+                    rna.plot_dot_bracket(dotbracket,seq=ntseq,energy=float(self.plot_mode_energy.value))
+                elif mode =='exclusion':
+                    self.sequence.value='\n'.join(sequence[0])+'\n/\n'+'\n'.join(sequence[1])
+                    align1 = Alignment(sequence[0])
+                    align2 = Alignment(sequence[1])
+                    exclusionpara=para.pop('exclusion',{})
+                    rna=Structure(align1,name,save_loc=cache_loc).fold(**para)
+                    b=Structure(align2,name,save_loc=cache_loc).fold(**para)
+                    rna.subtract(b,**exclusionpara)
+                elif mode in ['single','perturb']:
+                    self.sequence.value='\n'.join(sequence)
+                    seq,target=sequence
+                    cls = {'single':SingleStructureDesign,'perturb':StructurePerturbation}[mode]
+                    ssd=cls(seed=seq,target=target,**para)
+                    _=ssd.generate(**para)
+                    self.text.text="""
+                    <table style="width:100%">
+                    <caption style="text-align:center;font-family:cursive;font-size:150%">Single Strand Design Results: ({}/{:.1e})</caption>
+                    {}
+                    """.format(len(ssd.result),ssd.totalmutation,ssd.to_html())
+                    rna=Structure(ssd.result[0][0],name,save_loc=cache_loc).fold(**para)
+                self.structure = rna
+
+            save = name +'_'+ datetime.datetime.now().strftime("%m%d_%H%M%S")
             rna.restrict_fold(window,cluster,center)
+
+            if mode not in ['single','perturb']: # avoid update text display in other modes
+                self.text.text="""
+                <table style="width:100%">
+                <caption style="text-align:center;font-family:cursive;font-size:150%">Structure Prediction Results: ({})</caption>
+                {}
+                """.format(len(rna.dot),rna.print())
+
             rna.init_dotgraph(maxstr)
-            self.structure = rna
-            h,w=rna.plot_fold(save=save,plotbackend=self.plotbackendstatus)
+            h,w=rna.plot_fold(save=save,plotbackend=backend,showpara=(mode!='plot'))
+
             figh,figw= 800*h/(max(h,w)),800*w/(max(h,w))
             self.plot.text="""
             <img src="foldojo/static/cache/{}"  hspace='20' height='{:.0f}' width='{:.0f}'>
-            """.format(save+self.plotbackendstatus,figh,figw)
+            """.format(save+backend,figh,figw)
+            self.last_predict=(save+backend,figh,figw)
+            self.fold_status=ct
         except Exception as e:
             self.plot.text=str(e)
 
@@ -214,8 +433,8 @@ class structure_prediction():
 
 helptext="""
 <h2>Secondary Structure Prediction</h2>
-<h3>- based on <a href='https://rna.urmc.rochester.edu/RNAstructure.html'>RNAstructure package<a> and
-    <a href='https://www.tbi.univie.ac.at/RNA/'> ViennaRNA package<a> </h3>
+<h3>- based on <a href='https://rna.urmc.rochester.edu/RNAstructure.html'>RNAstructure package</a> and
+    <a href='https://www.tbi.univie.ac.at/RNA/'> ViennaRNA package</a> </h3>
 <p>Predicts the lowest free energy structure and suboptimal structures.</p>
 <h3>How To Use:</h3>
 <p>1. <b>Enter Sequence</b> Only enter oligo sequence. Case doesn't matter. Letters other than "ATGCUatgcu" will be automatically filtered out.
@@ -238,9 +457,66 @@ modification. In subsequent structure prediction, this nucleotide will
 be single stranded, at the end of a helix, or in or adjacent to a GU
 pair. format: same as #8</p>
 <p>13.<b>FMN Cleavage</b> Indicate a nucleotide that is accessible to FMN cleavage (a U in GU
-pair) (<a href='https://pubs.acs.org/doi/10.1021/ja962918p'>Reference<a>).
+pair) (<a href='https://pubs.acs.org/doi/10.1021/ja962918p'>Reference</a>).
 In subsequent structure prediction, this nucleotide will be in a GU
 pair.</p>
 <p>Click <b>Predict</b> will use current paramters to predict secondary structures.</p>
 <p>Click <b>Reset</b> will reset all parameters.</p>
 """
+
+
+class Header():
+    def __init__(self):
+        self.template="""
+        <style>
+        h1 {{
+          position: relative;
+          animation: mymove 2s;
+          animation-iteration-count: infinite;
+        }}
+
+        @keyframes mymove {{
+        0%  {{ border:4px outset #81F7F3;  }}
+        20% {{ border:4px outset #81F7F3; }}
+        50% {{ border:4px outset #ff66ff; }}
+        70% {{ border:4px outset #81F7F3; }}
+        100%{{ border:4px outset #81F7F3;}}
+        }}
+        </style>
+        <h1 style="width:1050px;height:50px;border: 4px outset #81F7F3;text-align:center;font-family:cursive;font-size:230%;color:#FF00BF;background-color:{color}"">
+        &#128540
+        <span style="color:#0000FF">F</span>
+        <span style="color:red">O</span>
+        <span style="color:#FFFF00">L</span>
+        <span style="color:#31B404">D</span>
+        <span style="color:#FF00BF">ojo </span>
+        &#129322
+        {subtitle}
+        </h1>
+        """
+
+    @property
+    def default(self):
+        return self.template.format(subtitle='',color='#81F7F3')
+    @property
+    def plot(self):
+        return self.template.format(subtitle='Plot Structure Mode',color='#088A85')
+    @property
+    def exclusion(self):
+        return self.template.format(subtitle='Structure Exclusion Mode',color='#0404B4')
+    @property
+    def single(self):
+        return self.template.format(subtitle='Single Strand Design Mode',color='#2EFE2E')
+    @property
+    def double(self):
+        # two strand design
+        return self.template.format(subtitle='Under Construction',color='#100719')
+    @property
+    def cofold(self):
+        return self.template.format(subtitle='Under Construction',color='#100719')
+    @property
+    def perturb(self):
+        return self.template.format(subtitle='Structure Perturbation Mode',color='#F5A9D0')
+
+
+header=Header()
