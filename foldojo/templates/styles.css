@@ -38,8 +38,10 @@ p {
 textarea
 {
     wrap:'off';
-    font-size:16px;
+    font-size:14px;
     font-family: monospace;
+    width: 1033px;
+	height: 120px;
 }
 
 .custom1

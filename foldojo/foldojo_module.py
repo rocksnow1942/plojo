@@ -9,7 +9,6 @@ from bokeh.layouts import widgetbox,column,row,layout
 from _structurepredict import Structure,SingleStructureDesign,StructurePerturbation
 import datetime
 from MSA import Alignment, buildMSA
-
 cache_loc=path.join(path.dirname(__file__),'static','cache')
 
 
@@ -29,7 +28,7 @@ class structure_prediction():
         # define gadgets
         #inputs
         self.sequence =TextAreaInput(title="Enter Sequence:",value='ACCCTTGCTTGCGTAGCATTTTACCAGTGAGTCGGATCTCCGCATATCTGCG',
-                            rows=7,cols=145,max_length=5000,width=1000,css_classes=['custom1'])
+                            rows=7,cols=150,max_length=5000,width=1000,css_classes=['custom1'])
         self.name=TextInput(title='Sequence Name',value='NewSequence',width=width)
         self.inputa_backbone =Select(title='Backbone type:',value='rna',options=[('rna','RNA'),('dna','DNA')],width=width)
         self.inputb_SetTemperature = TextInput(title='Set Temperature (C):',value='37',width=width)
@@ -104,9 +103,11 @@ class structure_prediction():
                                     menu = [('As PNG','.png'),('As SVG','.svg'),None,('Help','help')],width=buttonwidth)
 
 
+
         # misc
+        #
         self.header= Div(text=header.default,width=1000,height=40,css_classes=['custom1'])
-        self.plot = Div(text=helptext,width=800,height=900)
+        self.plot = Div(text="<h1>Welcome!<br><br>Today is {}.</h1>".format(datetime.datetime.now().strftime("%A, %B %-d")),width=800,height=900)
         self.text = Div(text='',width=800,height=900)
         self.plottab = Tabs(active=0,width=810,height=930,tabs=[Panel(child=self.plot,title='Output1'),Panel(child=self.text,title='Output2'),
                 Panel(child=self.para_settings,title="Parameters")])
@@ -373,7 +374,9 @@ class structure_prediction():
                     assert max(lengthlist) == min(lengthlist), ('input sequence not same length')
                     self.sequence.value='\n'.join(sequence)
                     align = Alignment(sequence,name=name)
+                    print(para)
                     rna=Structure(align,name,save_loc=cache_loc).fold(**para)
+
                 elif mode == 'plot':
                     assert max(lengthlist) == min(lengthlist), ('input sequence not same length')
                     self.sequence.value='\n'.join(sequence)
@@ -432,7 +435,7 @@ class structure_prediction():
 
 
 helptext="""
-<h2>Secondary Structure Prediction</h2>
+<h2>Secondary Structure Prediction (This is outdated help.)</h2>
 <h3>- based on <a href='https://rna.urmc.rochester.edu/RNAstructure.html'>RNAstructure package</a> and
     <a href='https://www.tbi.univie.ac.at/RNA/'> ViennaRNA package</a> </h3>
 <p>Predicts the lowest free energy structure and suboptimal structures.</p>
