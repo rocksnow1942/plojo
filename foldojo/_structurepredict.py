@@ -22,7 +22,6 @@ pd.options.display.max_colwidth = 500
 
 
 
-
 class lazyproperty():
     def __init__(self,func):
         self.func=func
@@ -127,7 +126,7 @@ class Structure:
         for i,(d,e,r) in enumerate(zip(self.dot[0:50],self.energy[0:50],self.ratio[0:50])):
             result['Predict'].append('Predict '+str(i+1))
             result['Structure'].append(d)
-            result['deltaG'].append(round(e,1))
+            result['deltaG'].append(e)
             result['Ratio'].append('{:.2e}'.format(r))
         df = pd.DataFrame(result)
         result=df.to_html(classes='table',index=False,justify='center',border=0).replace('\\n','<br>')
@@ -292,7 +291,7 @@ class Structure:
         prob = ensemble_to_prob(ss)
         probs=[prob for i in range(len(subopt))]
         pairtuples = [dotbracket_to_tuple(i[0]) for i in subopt]
-        return [i[0] for i in subopt],[i[1] for i in subopt],probs,pairtuples
+        return [i[0] for i in subopt],[round(i[1],1) for i in subopt],probs,pairtuples
 
 
     def _RNAstructure_fold(self,percent,**kwargs):
@@ -382,15 +381,16 @@ class Structure:
         return allstruct,allenergy,probs,pairtuples
 
     def _compare_method(self,percent,**kwargs):
-        soV,pV,ptV=self._ViennaRNA_fold(percent,**kwargs)
-        soR,pR,ptR=self._RNAstructure_fold(percent,**kwargs)
-        comS=set([i[0] for i in (soV)]) & set([i[0] for i in (soR)])
-        setV=dict(zip([i[0] for i in soV],zip([i[1] for i in soV],pV,ptV)))
-        setR=dict(zip([i[0] for i in soR],zip([i[1] for i in soR],pR,ptR)))
-        so_c = [(i,(setR[i][0],setV[i][0])) for i in comS]
-        p_c = [(setV[i][1]+setR[i][1])/2 for i in comS]
-        pt_c = [setV[i][2] for i in comS]
-        return so_c,p_c,pt_c
+        soV,eV,pV,ptV=self._ViennaRNA_fold(percent,**kwargs)
+        soR,eR,pR,ptR=self._RNAstructure_fold(percent,**kwargs)
+        comS=set(soV) & set(soR)
+        setV=dict(zip(soV,zip(eV,pV,ptV)))
+        setR=dict(zip(soR,zip(eR,pR,ptR)))
+        so_c = list(comS)
+        e_c = [(setR[i][0],setV[i][0]) for i in so_c]
+        p_c = [(setV[i][1]+setR[i][1])/2 for i in so_c]
+        pt_c = [setV[i][2] for i in so_c]
+        return so_c,e_c,p_c,pt_c
 
 
     def plot_fold(self,maxcol=100,save=False,showpara=True,**kwargs):
@@ -535,38 +535,12 @@ class SingleStructureDesign(MutableSequence):
         df['MFE']=df['MFE'].map('{:.1f}'.format)
         df['Ratio']=df['Ratio'].map('{:.3f}'.format)
         df['Predict']=df['Predict'].map('Predict {:>2}'.format)
-
-
-        # result=dict(zip(['Sequence','Ratio','MFE','TgtdG',],list(zip(*result))))
-        # df=pd.DataFrame(result).loc[:,['Sequence','TgtdG','MFE','Ratio']]
-        # df['TgtdG']=df['TgtdG'].map('{:.1f}'.format)
-        # df['MFE']=df['MFE'].map('{:.1f}'.format)
-        # df['Ratio']=df['Ratio'].map('{:.3f}'.format)
-        # df.index=['Predict '+str(i+1) for i in range(len(self.result))]
         self.df=df
         return df
 
     def to_html(self):
         result=self.df.to_html(classes='table',index=False,justify='center',border=0)#.replace('\\n','<br>')
         return result
-
-    def _generate_Vienna_single(self,n,top,SetTemperature=37,**kwargs):
-        if '*' in self.target:
-            return self._generate_RNAstructure(n,top,SetTemperature=SetTemperature,_rnastru=False,**kwargs)
-        else:
-            t=SetTemperature#self.foldpara.get('SetTemperature',37)
-            ViennaRNA.cvar.temperature=t
-            t=t+273.15
-            kT=8.314*t/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
-            kT=np.exp(-1/kT)
-            result=Design_collector(top,lambda x:x[1])
-            for i in self.mut_iterator(n):
-                fc=ViennaRNA.fold_compound(i)
-                ss,mfe=fc.mfe()
-                ene=fc.eval_structure(self.target)
-                r = kT**ene/kT**mfe
-                result.add((i,r,mfe,ene))
-        return result.collect()
 
     def _generate_Vienna(self,n,top,SetTemperature=37,**kwargs):
         if '*' in self.target:
@@ -592,32 +566,6 @@ class SingleStructureDesign(MutableSequence):
         r = kT**ene/kT**mfe
         return (seq,r,mfe,ene)
 
-
-    def _generate_RNAstructure_single(self,n,top,SetTemperature=37,_rnastru=True,**kwargs):
-        if '*' in self.target:
-            judge = Structure_eq('starmatch')
-        else:
-            judge = Structure_eq(kwargs.get('strexc_method','match'),kwargs.get('strexc_threshold',None))
-        foldmethod = Structure._RNAstructure_fold_ if _rnastru else Structure._ViennaRNA_fold_
-        result=Design_collector(top,lambda x:(x[1],-x[3]))
-        temp=SetTemperature#self.foldpara.get('SetTemperature',37)
-        t=temp+273.15
-        kT=8.314*t/1e3
-        kT=np.exp(-1/kT)
-        for i in self.mut_iterator(n):
-            s,e,*_ = foldmethod(1,sequence=i,percent=int(kwargs.get('percent',50)),SetTemperature=temp)
-            e=np.array(e)
-            totalR = (kT**(e)).sum()
-            mfe=np.min(e)
-            ene_=[]
-            r_=[]
-            for si,ene in zip(s,e):
-                if judge(self.target,si):
-                    ene_.append(ene)
-                    r_.append(kT**ene/totalR)
-            if r_:
-                result.add((i, sum(r_) ,mfe,min(ene_)))
-        return result.collect()
 
     def _generate_RNAstructure(self,n,top,SetTemperature=37,_rnastru=True,**kwargs):
         """

@@ -14,6 +14,7 @@ cache_loc=path.join(path.dirname(__file__),'static','cache')
 
 """
 known bug:
+compare method have a bug.
 
 """
 
@@ -107,7 +108,7 @@ class structure_prediction():
         # misc
         #
         self.header= Div(text=header.default,width=1000,height=40,css_classes=['custom1'])
-        self.plot = Div(text="<h1>Welcome!<br><br>Today is {}.</h1>".format(datetime.datetime.now().strftime("%A, %B %-d")),width=800,height=900)
+        self.plot = Div(text="<h2>Welcome!<br><br>Today is {}.</h2>".format(datetime.datetime.now().strftime("%A, %B %-d")),width=800,height=900)
         self.text = Div(text='',width=800,height=900)
         self.plottab = Tabs(active=0,width=810,height=930,tabs=[Panel(child=self.plot,title='Output1'),Panel(child=self.text,title='Output2'),
                 Panel(child=self.para_settings,title="Parameters")])
@@ -374,7 +375,7 @@ class structure_prediction():
                     assert max(lengthlist) == min(lengthlist), ('input sequence not same length')
                     self.sequence.value='\n'.join(sequence)
                     align = Alignment(sequence,name=name)
-                    print(para)
+
                     rna=Structure(align,name,save_loc=cache_loc).fold(**para)
 
                 elif mode == 'plot':
@@ -396,6 +397,7 @@ class structure_prediction():
                     b=Structure(align2,name,save_loc=cache_loc).fold(**para)
                     rna.subtract(b,**exclusionpara)
                 elif mode in ['single','perturb']:
+                    title ={'single':'Single Strand Design',"perturb":"Structure Perturbation"}[mode]
                     self.sequence.value='\n'.join(sequence)
                     seq,target=sequence
                     cls = {'single':SingleStructureDesign,'perturb':StructurePerturbation}[mode]
@@ -403,9 +405,9 @@ class structure_prediction():
                     _=ssd.generate(**para)
                     self.text.text="""
                     <table style="width:100%">
-                    <caption style="text-align:center;font-family:cursive;font-size:150%">Single Strand Design Results: ({}/{:.1e})</caption>
+                    <caption style="text-align:center;font-family:cursive;font-size:150%">{} Results: ({}/{:.1e})</caption>
                     {}
-                    """.format(len(ssd.result),ssd.totalmutation,ssd.to_html())
+                    """.format(title,len(ssd.result),ssd.totalmutation,ssd.to_html())
                     rna=Structure(ssd.result[0][0],name,save_loc=cache_loc).fold(**para)
                 self.structure = rna
 
