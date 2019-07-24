@@ -96,7 +96,7 @@ class Structure:
         if len(energy.shape)>1:energy = np.mean(energy,axis=1)
         t=self.foldpara.get('SetTemperature',37)
         t=t+273.15
-        kT=8.314*t/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
+        kT=8.314*t/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
         kT=np.exp(-1/kT)
         return kT**(energy)/((kT**(energy)).sum())
 
@@ -110,7 +110,7 @@ class Structure:
         # kR=1.380649e-23*8.314/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
         t=self.foldpara.get('SetTemperature',37)
         t=t+273.15
-        kT=8.314*t/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
+        kT=8.314*t/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
         kT=np.exp(-1/kT)
         return kT**(energy)/((kT**(energy)).sum())
 
@@ -127,9 +127,9 @@ class Structure:
         for i,(d,e,r,ed) in enumerate(zip(self.dot[0:50],self.energy[0:50],self.ratio[0:50],self.ensembledefect[0:50])):
             result['Predict'].append('Predict '+str(i+1))
             result['Structure'].append(d)
-            result['deltaG'].append("{:.2f}".format(e))
-            result['Ratio'].append('{:.3f}'.format(r))
-            result['ED'].append('{:.3f}'.format(ed))
+            result['deltaG'].append(e)
+            result['Ratio'].append('{:.1f}'.format(r*100))
+            result['ED'].append(ed)
         df = pd.DataFrame(result)
         result=df.to_html(classes='table',index=False,justify='center',border=0).replace('\\n','<br>')
         result=result.replace('##',seq)
@@ -280,7 +280,7 @@ class Structure:
         # compute partition function to fill DP matrices
         _=fc.pf()
         # compute ensemble defect.
-        ed = [fc.ensemble_defect(i[0]) for i in subopt]
+        ed = [round(fc.ensemble_defect(i[0]),3) for i in subopt]
 
         ss = list()
         num_samples = 10000
@@ -548,7 +548,7 @@ class SingleStructureDesign(MutableSequence):
             t=SetTemperature#self.foldpara.get('SetTemperature',37)
             ViennaRNA.cvar.temperature=t
             t=t+273.15
-            kT=8.314*t/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
+            kT=8.314*t/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
             kT=np.exp(-1/kT)
             result=Design_collector(top,lambda x:(x[1],-x[3]))
             task = partial(self._ViennaRNA_task,kT=kT)
@@ -578,7 +578,7 @@ class SingleStructureDesign(MutableSequence):
         result=Design_collector(top,lambda x:(x[1],-x[3]))
         temp=SetTemperature#self.foldpara.get('SetTemperature',37)
         t=temp+273.15
-        kT=8.314*t/1e3
+        kT=8.314*t/4.184e3
         kT=np.exp(-1/kT)
         total = self.totalmutation if n > 0.5*self.totalmutation else n
         task=partial(self._RNAstructure_task,judge=judge,foldmethod=foldmethod,percent=int(kwargs.get('percent',50)),temp=temp,kT=kT)
@@ -657,7 +657,7 @@ class StructurePerturbation(SingleStructureDesign):
         t=SetTemperature#self.foldpara.get('SetTemperature',37)
         ViennaRNA.cvar.temperature=t
         t=t+273.15
-        kT=8.314*t/1e3 # Boltzmann constant * Gas constant then convert kJ to J.
+        kT=8.314*t/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
         kT=np.exp(-1/kT)
         if goal=='inhibit':
             sorter = lambda x:(x[3],-x[1])
@@ -1699,7 +1699,7 @@ class DotGraph(DotGraphConstructor):
         # height = datalim[1][1] - datalim[0][1]
         # print(width,height)
         energy = "({:.1f},{:.1f})".format(*self.energy) if isinstance(self.energy,tuple) else round(self.energy,1)
-        ax.set_title("{}, dG={}, ED={:.3f}".format(self.name,energy,self.ratio))
+        ax.set_title("{}, dG={}, ED={}".format(self.name,energy,self.ratio))
         ax.set_aspect('equal', 'datalim')
         ax.update_datalim(datalim)
         ax.autoscale_view()
