@@ -14,7 +14,7 @@ cache_loc=path.join(path.dirname(__file__),'static','cache')
 
 """
 known bug:
-compare method have a bug.
+
 
 """
 

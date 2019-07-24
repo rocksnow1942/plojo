@@ -98,7 +98,11 @@ class Structure:
         t=t+273.15
         kT=8.314*t/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
         kT=np.exp(-1/kT)
-        return kT**(energy)/((kT**(energy)).sum())
+        if getattr(self,'_pf',None):
+            Q=kT**self._pf
+        else:
+            Q=((kT**(energy)).sum())
+        return kT**(energy)/Q
 
     @property
     def _ratio(self):
@@ -112,7 +116,11 @@ class Structure:
         t=t+273.15
         kT=8.314*t/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
         kT=np.exp(-1/kT)
-        return kT**(energy)/((kT**(energy)).sum())
+        if getattr(self,'_pf',None):
+            Q=kT**self._pf
+        else:
+            Q=((kT**(energy)).sum())
+        return kT**(energy)/Q
 
     def print(self,):
         # &nbsp
@@ -218,7 +226,7 @@ class Structure:
         else:
             self.align = Alignment('N'*len(dotbracket))
         self._dot=[dotbracket]
-        self._energy,self._prob,self._pairtuple=[energy],[[1]*len(dotbracket)],[dotbracket_to_tuple(dotbracket)]
+        self._energy,self._prob,self._pairtuple,self._ensembledefect=[energy],[[1]*len(dotbracket)],[dotbracket_to_tuple(dotbracket)],[0]
 
     def _ViennaRNA_fold(self,percent,**kwargs):
         """
@@ -278,7 +286,7 @@ class Structure:
         # rescale Boltzmann factors according to MFE
         fc.exp_params_rescale(mfe)
         # compute partition function to fill DP matrices
-        _=fc.pf()
+        _,self._pf=fc.pf()
         # compute ensemble defect.
         ed = [round(fc.ensemble_defect(i[0]),3) for i in subopt]
 
@@ -528,12 +536,13 @@ class SingleStructureDesign(MutableSequence):
         result=methods[method](n,top,**kwargs)
         # result=sorted(result,key=lambda x:(-x[1],x[3]))
         self.result=result
-        result=dict(zip(['Predict','Sequence','Ratio','MFE','TgtdG',],[list(range(1,1+len(result)))]+list(zip(*result))))
-        df=pd.DataFrame(result).loc[:,['Predict','Sequence','TgtdG','MFE','Ratio']]
+        result=dict(zip(['Predict','Sequence','Ratio','MFE','TgtdG','ED'],[list(range(1,1+len(result)))]+list(zip(*result))))
+        df=pd.DataFrame(result).loc[:,['Predict','Sequence','TgtdG','MFE','Ratio','ED']]
         df['TgtdG']=df['TgtdG'].map('{:.1f}'.format)
         df['MFE']=df['MFE'].map('{:.1f}'.format)
-        df['Ratio']=df['Ratio'].map('{:.3f}'.format)
+        df['Ratio']=df['Ratio'].map(partial(round,ndigits=3))
         df['Predict']=df['Predict'].map('Predict {:>2}'.format)
+        df['ED']=df['ED'].map(partial(round,ndigits=3))
         self.df=df
         return df
 
@@ -550,7 +559,7 @@ class SingleStructureDesign(MutableSequence):
             t=t+273.15
             kT=8.314*t/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
             kT=np.exp(-1/kT)
-            result=Design_collector(top,lambda x:(x[1],-x[3]))
+            result=Design_collector(top,lambda x:(x[1],-x[4],-x[3]))
             task = partial(self._ViennaRNA_task,kT=kT)
             total = self.totalmutation if n > 0.5*self.totalmutation else n
             tempresult = poolwrapper(task,self.mut_iterator(n),total=total,showprogress=True)
@@ -560,10 +569,12 @@ class SingleStructureDesign(MutableSequence):
 
     def _ViennaRNA_task(self,seq,kT):
         fc=ViennaRNA.fold_compound(seq)
-        ss,mfe=fc.mfe()
+        _,gfe = fc.pf()
+        _,mfe=fc.mfe()
+        ed=fc.ensemble_defect(self.target)
         ene=fc.eval_structure(self.target)
-        r = kT**ene/kT**mfe
-        return (seq,r,mfe,ene)
+        r = kT**ene/kT**gfe*100
+        return (seq,r,mfe,ene,ed)
 
 
     def _generate_RNAstructure(self,n,top,SetTemperature=37,_rnastru=True,**kwargs):
@@ -575,7 +586,7 @@ class SingleStructureDesign(MutableSequence):
         else:
             judge = Structure_eq(kwargs.get('strexc_method','match'),kwargs.get('strexc_threshold',None))
         foldmethod = Structure._RNAstructure_fold_ if _rnastru else Structure._ViennaRNA_fold_
-        result=Design_collector(top,lambda x:(x[1],-x[3]))
+        result=Design_collector(top,lambda x:(-x[3],-x[4],x[1]))
         temp=SetTemperature#self.foldpara.get('SetTemperature',37)
         t=temp+273.15
         kT=8.314*t/4.184e3
@@ -592,18 +603,20 @@ class SingleStructureDesign(MutableSequence):
         """
         multiprocessing task.
         """
-        s,e,*_ = foldmethod(1,sequence=seq,percent=percent,SetTemperature=temp)
+        s,e,*_,ed = foldmethod(1,sequence=seq,percent=percent,SetTemperature=temp)
         e=np.array(e)
         totalR = (kT**(e)).sum()
         mfe=np.min(e)
         ene_=[]
         r_=[]
-        for si,ene in zip(s,e):
+        ed_=[]
+        for si,ene,edi in zip(s,e,ed):
             if judge(self.target,si):
                 ene_.append(ene)
                 r_.append(kT**ene/totalR)
+                ed_.append(edi)
         if r_:
-            return (seq, sum(r_) ,mfe,min(ene_))
+            return (seq, sum(r_)*100 ,mfe,min(ene_),np.mean(ed_))
         else:
             return None
 
@@ -660,9 +673,9 @@ class StructurePerturbation(SingleStructureDesign):
         kT=8.314*t/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
         kT=np.exp(-1/kT)
         if goal=='inhibit':
-            sorter = lambda x:(x[3],-x[1])
+            sorter = lambda x:(-x[1],x[3],x[4],) # order is 1: ratio,2: mfe, 3:ene, 4:ED
         else:
-            sorter = lambda x:(-x[3],x[1])
+            sorter = lambda x:(x[1],-x[4],-x[3])
         result=Design_collector(50,sorter)
         task = partial(self._ViennaRNA_task,kT=kT) # return (seq,ratio, mfe, energy)
         total = self.totalmutation if iteration > 0.5*self.totalmutation else iteration
@@ -672,15 +685,18 @@ class StructurePerturbation(SingleStructureDesign):
         self.result=result.collect()
         original = self._ViennaRNA_task(self.seq,kT)
         result = [original] + self.result
-        result=dict(zip(['Predict','Sequence','Ratio','MFE','TgtdG',],[list(range(len(result)))]+list(zip(*result))))
-        df=pd.DataFrame(result).loc[:,['Predict','Sequence','TgtdG','MFE','Ratio']]
+        result=dict(zip(['Predict','Sequence','Ratio','MFE','TgtdG','ED'],[list(range(len(result)))]+list(zip(*result))))
+        df=pd.DataFrame(result).loc[:,['Predict','Sequence','TgtdG','MFE','Ratio','ED']]
         df['TgtdG']=df['TgtdG'].map('{:.1f}'.format)
         df['MFE']=df['MFE'].map('{:.1f}'.format)
-        df['Ratio']=df['Ratio'].map('{:.3f}'.format)
+        df['Ratio']=df['Ratio'].map(partial(round,ndigits=3))
         df['Predict']=df['Predict'].map('Predict {:>2}'.format)
+        df['ED']=df['ED'].map(partial(round,ndigits=3))
         df.iloc[0,0]='Original'
         self.df=df
         return df
+
+
 
 
 class TowMutableSequence():
@@ -690,8 +706,6 @@ class TowMutableSequence():
 class TwoStructureDesign:
     def __init__(self,s1,s2,t1,t2):
         pass
-
-
 
 
 class SPT_collector():
@@ -768,9 +782,9 @@ class Design_collector():
         if entry is None:
             return 0
         func=self.func
-        if (self.edge is None) or (func(entry) >= self.edge):
-            self.edge = func(entry)
-            heapq.heappush(self.data,(self.edge,entry))
+        # if (self.edge is None) or (func(entry) >= self.edge):
+        self.edge = func(entry)
+        heapq.heappush(self.data,(self.edge,entry))
         if len(self.data)>self.limit:
             heapq.heappop(self.data)
 
