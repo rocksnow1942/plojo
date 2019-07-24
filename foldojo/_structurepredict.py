@@ -117,23 +117,23 @@ class Structure:
     def print(self,):
         # &nbsp
         # pd.options.display.max_colwidth = 500
-        result={'Predict':[],'Structure':[],'deltaG':[],'Ratio':[]}
+        result={'Predict':[],'Structure':[],'deltaG':[],'Ratio':[],'ED':[]}
         seq=self.align.format(index=True).replace('\n','<br>')
         result['Predict'].append('Sequence')
         result['Structure'].append('##')
         result['deltaG'].append('')
         result['Ratio'].append('')
-        for i,(d,e,r) in enumerate(zip(self.dot[0:50],self.energy[0:50],self.ratio[0:50])):
+        result['ED'].append('')
+        for i,(d,e,r,ed) in enumerate(zip(self.dot[0:50],self.energy[0:50],self.ratio[0:50],self.ensembledefect[0:50])):
             result['Predict'].append('Predict '+str(i+1))
             result['Structure'].append(d)
-            result['deltaG'].append(e)
-            result['Ratio'].append('{:.2e}'.format(r))
+            result['deltaG'].append("{:.2f}".format(e))
+            result['Ratio'].append('{:.3f}'.format(r))
+            result['ED'].append('{:.3f}'.format(ed))
         df = pd.DataFrame(result)
         result=df.to_html(classes='table',index=False,justify='center',border=0).replace('\\n','<br>')
         result=result.replace('##',seq)
         return result
-
-
 
     def remove(self,toremove):
         """
@@ -147,7 +147,6 @@ class Structure:
                 np.append(p)
                 npt.append(pt)
         self._dot,self._energy,self._prob,self._pairtuple=nd,ne,np,npt
-
 
     def subtract(self,b,threshold,method='match',diffthreshold=4):
         """
@@ -166,7 +165,6 @@ class Structure:
                         toremove.append(d)
         self.remove(toremove)
 
-
     def fold(self,method='RNAstructure',percent=50,**kwargs):
         """
         method: RNAstructure, ViennaRNA,Compare_RV
@@ -175,7 +173,7 @@ class Structure:
         self.foldpara.update(percent=percent,method=method)
         methods={'RNAstructure':self._RNAstructure_fold,'ViennaRNA':self._ViennaRNA_fold,
             'Compare_RV':self._compare_method}
-        self._dot,self._energy,self._prob,self._pairtuple=methods[method](percent=percent,**kwargs)
+        self._dot,self._energy,self._prob,self._pairtuple,self._ensembledefect=methods[method](percent=percent,**kwargs)
          # total suboptimal is the number before restricted by window size, but it is filtered by single pair.
         # self.restrict_fold(so,p,pt,window,maxstr,method)
         assert len(self._dot)>0,('No structures can be folded.')
@@ -188,12 +186,13 @@ class Structure:
         center :
         """
         self.foldpara.update(window=window)
-        so,p,pt,energy=self._dot,self._prob,self._pairtuple,self._energy
-        temp = dict(zip(so,zip(p,pt,energy)))
+        so,p,pt,energy,ed=self._dot,self._prob,self._pairtuple,self._energy,self._ensembledefect
+        temp = dict(zip(so,zip(p,pt,energy,ed)))
         self.dot=cluster_and_center(list(zip(so,energy)),window,cluster=cluster,center=center)
         self.prob=[temp[i][0] for i in self.dot]
         self.pairtuple = [temp[i][1] for i in self.dot]
         self.energy = [temp[i][2] for i in self.dot]
+        self.ensembledefect = [temp[i][3] for i in self.dot]
         return self
 
     def init_dotgraph(self,maxstr=8,repseq='iupac',**kwargs):
@@ -208,7 +207,7 @@ class Structure:
             raise ValueError ('Wrong rep sequence code.')
 
         dot = self.dot[0:int(maxstr)]
-        self.dotgraph = [DotGraph(seq,*i,name=f"Predict {k+1}") for k,i in enumerate(zip(dot,self.energy,self.prob,self.pairtuple,self.ratio))]
+        self.dotgraph = [DotGraph(seq,*i,name=f"Predict {k+1}") for k,i in enumerate(zip(dot,self.energy,self.prob,self.pairtuple,self.ensembledefect))]
         return self
 
     def plot_dot_bracket(self,dotbracket,seq=None,energy=0):
@@ -228,14 +227,12 @@ class Structure:
         self.foldpara.update(kwargs)
         if len(self.align.seq)==1:
             return self._ViennaRNA_fold_(self.align.seq[0],percent,**kwargs)
-        sc=SPT_collector()
+        sc=SPT_collector(order=(1,1,0,1))
         for i in self.align.seq:
-            sc.fill(*self._ViennaRNA_fold_(i,percent,**kwargs),i)
+            sc.fill(i,*self._ViennaRNA_fold_(i,percent,**kwargs))
             print('After {}, total structures = {}'.format(i,len(sc.data)))
-
         # force save the alifold Algorithm result avoid collison in SPT collector.
         sc.init(*self._ViennaRNA_fold_(self.align.seq,percent,**kwargs))
-
         return sc.output()
 
     def _ViennaRNA_fold_(self,sequence,percent,**kwargs):
@@ -282,6 +279,9 @@ class Structure:
         fc.exp_params_rescale(mfe)
         # compute partition function to fill DP matrices
         _=fc.pf()
+        # compute ensemble defect.
+        ed = [fc.ensemble_defect(i[0]) for i in subopt]
+
         ss = list()
         num_samples = 10000
         iterations  = 10
@@ -291,8 +291,7 @@ class Structure:
         prob = ensemble_to_prob(ss)
         probs=[prob for i in range(len(subopt))]
         pairtuples = [dotbracket_to_tuple(i[0]) for i in subopt]
-        return [i[0] for i in subopt],[round(i[1],1) for i in subopt],probs,pairtuples
-
+        return [i[0] for i in subopt],[round(i[1],1) for i in subopt],probs,pairtuples,ed
 
     def _RNAstructure_fold(self,percent,**kwargs):
         """
@@ -303,11 +302,10 @@ class Structure:
             assert set(i)<=set('ATCGU'), ('Nucleotide code {} is not supported in RNAstructure Algorithm.'.format(set(i)-set('ATCGU')))
         if len(self.align.seq)==1:
             return self._RNAstructure_fold_(self.align.seq[0],percent,**kwargs)
-        sc=SPT_collector()
+        sc=SPT_collector(order=(1,1,0,1))
         for i in self.align.seq:
-            sc.fill(*self._RNAstructure_fold_(i,percent,**kwargs),i)
+            sc.fill(i,*self._RNAstructure_fold_(i,percent,**kwargs))
         return sc.output()
-
 
     def _RNAstructure_fold_(self,sequence,percent,**kwargs):
         """
@@ -358,6 +356,7 @@ class Structure:
         allenergy=[]
         probs=[]
         pairtuples=[]
+        ed = []
         structurenumber=p.GetStructureNumber()
         for i in range(1,structurenumber+1):
             energy = p.GetFreeEnergy(i)
@@ -377,8 +376,9 @@ class Structure:
             pairtuples.append(pairtuple)
             allstruct.append(dotbracket)
             allenergy.append(energy)
+            ed.append(round(p.GetEnsembleDefect(i)/len(sequence),3))
             probs.append(np.nan_to_num(np.array(prob)))
-        return allstruct,allenergy,probs,pairtuples
+        return allstruct,allenergy,probs,pairtuples,ed
 
     def _compare_method(self,percent,**kwargs):
         soV,eV,pV,ptV=self._ViennaRNA_fold(percent,**kwargs)
@@ -391,7 +391,6 @@ class Structure:
         p_c = [(setV[i][1]+setR[i][1])/2 for i in so_c]
         pt_c = [setV[i][2] for i in so_c]
         return so_c,e_c,p_c,pt_c
-
 
     def plot_fold(self,maxcol=100,save=False,showpara=True,**kwargs):
         strutno=len(self.dotgraph)
@@ -589,7 +588,6 @@ class SingleStructureDesign(MutableSequence):
 
         return result.collect()
 
-
     def _RNAstructure_task(self,seq,judge,foldmethod,percent,temp,kT):
         """
         multiprocessing task.
@@ -696,35 +694,29 @@ class TwoStructureDesign:
 
 
 
-
-
-
-
-
-
 class SPT_collector():
     """
     container class for dotbracket, probability and tuples
+    this container will only fill in dots thats already initiated.
     """
-    def __init__(self):
+    def __init__(self,order=(1,1,0,1)):
         self.data={}
         self.initiated=False
-
-    def init(self,s,_e,p,t):
+        self.dataaggregateorder=order
+    def init(self,s,*args):
+        assert len(args)==len(self.dataaggregateorder),('data length must equal dataaggregateorder')
         self.initiated=True
-        if not isinstance(s,list):
-            s,_e,p,t=[s],[_e],[p],[t]
-        for d,e,_p,_t in zip(s,_e,p,t):
+        for d,*data in zip(s,*args):
             if d not in self.data:
-                self.data[d]=[e,_p,_t,1]
+                self.data[d]=list(data)+[1]
             else:
-                self.add(d,e,_p,_t)
+                self.add(d,*data)
 
-    def fill(self,s,e,p,t,seq):
+    def fill(self,seq,s,*args):
         if self.data or self.initiated:
-            self.intersect(s,e,p,t,seq)
+            self.intersect(seq,s,*args)
         else:
-            self.init(s,e,p,t)
+            self.init(s,*args)
 
     def seq_str_eq(self,seq,s1,s2):
         for n,s,t in zip(seq,s1,s2):
@@ -735,29 +727,35 @@ class SPT_collector():
                     return False
         return True
 
-    def intersect(self,s,_e,p,t,seq):
-        if not isinstance(s,list):
-            s,_e,p,t=[s],[_e],[p],[t]
-        suboptlist=s
-        self.data={i:j for i,j in self.data.items() if i in suboptlist}
+    def intersect(self,seq,s,*args):
+        self.data={i:j for i,j in self.data.items() if i in s}
         new = {}
-        for d,e,_p,_t in zip(s,_e,p,t):
+        for d,*data in zip(s,*args):
             for k in self.data:
                 if self.seq_str_eq(seq,d,k):
-                    pe,p_p,_t,count=self.data[k]
-                    new[k]=[(pe*count+e)/(count+1),(p_p*count+_p)/(count+1),_t,count+1]
+                    *olddata,count=self.data[k]
+                    new[k]=self.dataaggregate_method(olddata,data,count)
         self.data=new
 
-    def add(self,d,e,_p,_t):
-        pe,p_p,_t,count=self.data[d]
-        self.data[d]=[(pe*count+e)/(count+1),(p_p*count+_p)/(count+1),_t,count+1]
+    def dataaggregate_method(self,old,new,count):
+        result=[]
+        for a,o,n in zip(self.dataaggregateorder,old,new):
+            if a:
+                result.append((o*count+n)/(count+1))
+            else:
+                result.append(o)
+        return result
+
+    def add(self,d,*data):
+        *olddata,count=self.data[d]
+        self.data[d]=self.dataaggregate_method(olddata,data,count)
 
     def output(self):
         s=[k for k,i in self.data.items()]
-        e=[i[0] for k,i in self.data.items()]
-        p=[i[1] for k,i in self.data.items()]
-        t=[i[2] for k,i in self.data.items()]
-        return s,e,p,t
+        r=[]
+        for z in range(len(self.dataaggregateorder)):
+            r.append([i[z] for k,i in self.data.items()])
+        return (s,*r)
 
 class Design_collector():
     def __init__(self,limit=100,func=None):
@@ -1701,7 +1699,7 @@ class DotGraph(DotGraphConstructor):
         # height = datalim[1][1] - datalim[0][1]
         # print(width,height)
         energy = "({:.1f},{:.1f})".format(*self.energy) if isinstance(self.energy,tuple) else round(self.energy,1)
-        ax.set_title("{}, dG={}, R={:.2e}".format(self.name,energy,self.ratio))
+        ax.set_title("{}, dG={}, ED={:.3f}".format(self.name,energy,self.ratio))
         ax.set_aspect('equal', 'datalim')
         ax.update_datalim(datalim)
         ax.autoscale_view()
@@ -1759,7 +1757,6 @@ def any_difference_of_one(stem, bulge):
                     return True
     return False
 
-
 def remove_vertex(bg, v):
     """
     Delete a node after merging it with another
@@ -1777,7 +1774,6 @@ def remove_vertex(bg, v):
     # delete all edges from this node
     del bg.edges[v]
     del bg.defines[v]
-
 
 def relabel_node(bg, old_name, new_name):
     """
@@ -1808,7 +1804,6 @@ def relabel_node(bg, old_name, new_name):
                 new_edges.add(e)
         bg.edges[k] = new_edges
 
-
 def rotate_coord(origin, point, angle):
     """
     Rotate a point counterclockwise by a given angle around a given origin.
@@ -1830,8 +1825,6 @@ def scalar_to_rgb(scalar,map):
     cNorm  = colors.Normalize(vmin=np.min(scalar), vmax=np.max(scalar))
     scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
     return scalarMap.to_rgba
-
-
 
 def magnitude(vec):
     '''
@@ -1996,9 +1989,6 @@ def _annotate_rna_plot(ax, cg, coords, annotations, text_kwargs):
         if _clashfree_annot_pos(annot_pos, coords):
             ax.annotate(annot_dict[mloop], xy=annot_pos,
                         ha="center", va="center", **text_kwargs )
-        # else:
-            # print("Cannot annotate %s as '%s' , because of insufficient space." % (mloop, annot_dict[mloop]))
-
 
 def panel_count(n,maxcol):
     r=int(np.ceil(np.sqrt(n)))
@@ -2008,8 +1998,6 @@ def panel_count(n,maxcol):
     else:
         row=int(np.ceil(n/maxcol))
         return (row,maxcol)
-
-
 
 def dotbracket_to_tuple(struct):
     """
@@ -2059,8 +2047,6 @@ def ensemble_to_prob(ensemble):
     ens=np.array([ [k!='.' for k in i] for i in ensemble],int)
     ens=ens.mean(axis=0)
     return ens
-
-
 
 def kdistance(s1,s2):
     return sum([i!=j for i,j in zip(s1,s2)])
