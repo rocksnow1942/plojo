@@ -41,7 +41,7 @@ class structure_prediction():
         self.inputh_ForcePair = TextInput(title='Force Pair',value='None',width=width)
         self.inputi_ForceProhibitPair = TextInput(title='Force No Pair',value='None',width=width)
         self.method = Select(title='Prediction Algorithm',value='RNAstructure',width=width,
-                                    options=[('RNAstructure','RNAstructure'),('ViennaRNA','ViennaRNA'),('Compare_RV','Compare RS and VR')])
+                                    options=[('RNAstructure','RNAstructure'),('ViennaRNA','ViennaRNA'),('Nupack', 'Nupack'),('Compare_RV','Compare RS and VR')])
         self.parainputs = [i for k,i in sorted(self.__dict__.items(),key=lambda x:x[0]) if k.startswith('input')]
 
         # align parameters

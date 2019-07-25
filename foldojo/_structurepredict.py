@@ -17,6 +17,7 @@ from MSA import Alignment,IUPAC_decode,poolwrapper
 import random
 import heapq
 import pandas as pd
+import NUPACK as NPK
 
 pd.options.display.max_colwidth = 500
 
@@ -180,7 +181,7 @@ class Structure:
         """
         self.foldpara.update(percent=percent,method=method)
         methods={'RNAstructure':self._RNAstructure_fold,'ViennaRNA':self._ViennaRNA_fold,
-            'Compare_RV':self._compare_method}
+            'Compare_RV':self._compare_method,'Nupack':self._Nupack_fold}
         self._dot,self._energy,self._prob,self._pairtuple,self._ensembledefect=methods[method](percent=percent,**kwargs)
          # total suboptimal is the number before restricted by window size, but it is filtered by single pair.
         # self.restrict_fold(so,p,pt,window,maxstr,method)
@@ -227,6 +228,43 @@ class Structure:
             self.align = Alignment('N'*len(dotbracket))
         self._dot=[dotbracket]
         self._energy,self._prob,self._pairtuple,self._ensembledefect=[energy],[[1]*len(dotbracket)],[dotbracket_to_tuple(dotbracket)],[0]
+        
+        
+    def _Nupack_fold(self,percent,**kwargs):
+        self.foldpara.update(kwargs)
+        if len(self.align.seq)==1:
+            return self._Nupack_fold_(self.align.seq[0],percent,**kwargs)
+        
+
+    def _Nupack_fold_(self,sequence,percent,backbone='rna',**kwargs):
+        sequence=[sequence]
+        dangles=kwargs.get('dangles','some')
+        temp=kwargs.get('SetTemperature',37)
+        pseudo=kwargs.get('pseudo',False)
+        sodium=kwargs.get('sodium',0.15)
+        magnesium=kwargs.get('magnesium',0.002)
+        percent=min(percent,40)
+        para=dict(T=temp,material=backbone,pseudo=pseudo,sodium=sodium,magnesium=magnesium,dangles=dangles)
+        
+        self._pf=NPK.pfunc(sequence,**para)
+        ss,mfe=NPK.mfe(sequence,**para)[0]
+        mfe=float(mfe)
+        enerange=abs(mfe)*percent/100
+        subopt=NPK.subopt(sequence,enerange,**para)
+        prob = NPK.pairs(sequence,cutoff=0.0,**para)
+        probdict={(i[0],i[1]):i[2] for i in prob}
+        
+        
+        subdot=[i[0] for i in subopt]
+        subene = [round(float(i[1]),1) for i in subopt]
+        pairtuple = [dotbracket_to_tuple(i) for i in subdot]
+        prob=[[probdict.get(j,0) for j in i] for i in pairtuple]
+        ed = [ NPK.defect(sequence,i) for i in subdot]
+        return subdot,subene,prob,pairtuple,ed
+        
+        
+        
+        
 
     def _ViennaRNA_fold(self,percent,**kwargs):
         """
