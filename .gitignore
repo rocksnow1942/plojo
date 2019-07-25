@@ -10,6 +10,9 @@ __pycache__/
 *.png
 temp.py
 test*.py
+RNAstructure/
+ViennaRNA/
+cache/
 
 # C extensions
 *.so
