@@ -32,10 +32,20 @@ Hui 0721/2019
 Need to put NUPACK executables in
 '/usr/local/nupack3.0.6'
 """
+import platform
 
-filepath=os.path.dirname(__file__)
+
+systemname = platform.node()
+
+if systemname.startswith('huis-mac-mini'):
+    pass
+elif systemname.startswith('huis-mbp'):
+    os.environ['NUPACKHOME']='/Users/hui/Documents/Scripts/plojo_app/foldojo/NUPACK/nupack3.0.6'#os.path.join(filepath,'nupack3.0.6')
+else:
+    os.environ['NUPACKHOME']='/home/hui/Documents/linux_RNApackages/nupack3.0.6'#os.path.join(filepath,'nupack3.0.6')
+
+# filepath=os.path.dirname(__file__)
 # os.environ['PATH']+=(':'+filepath)
-os.environ['NUPACKHOME']='/home/hui/Documents/linux_RNApackages/nupack3.0.6'#os.path.join(filepath,'nupack3.0.6')
 
 
 def dGadjust(T, N):
