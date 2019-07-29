@@ -34,8 +34,8 @@ Need to put NUPACK executables in
 """
 
 filepath=os.path.dirname(__file__)
-os.environ['PATH']+=(':'+filepath)
-# os.environ['NUPACKHOME']='/usr/local/nupack3.0.6'
+# os.environ['PATH']+=(':'+filepath)
+os.environ['NUPACKHOME']='/home/hui/Documents/linux_RNApackages/nupack3.0.6'#os.path.join(filepath,'nupack3.0.6')
 
 
 def dGadjust(T, N):
