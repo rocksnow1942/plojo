@@ -4,6 +4,7 @@ from os import path
 # from bokeh.models import HoverTool,Slider,RangeSlider
 from bokeh.models.widgets import Button, TextInput,Div,TextAreaInput,Select,Dropdown, CheckboxGroup,PreText,Tabs,Panel
 from bokeh.layouts import widgetbox,column,row,layout
+# from bokeh.models import CustomJS
 # import numpy as np
 # from simu_utils import file_save_location,file_name
 from _structurepredict import Structure,SingleStructureDesign,StructurePerturbation,MultiStructureDesign,Multistrand
@@ -14,10 +15,8 @@ cache_loc=path.join(path.dirname(__file__),'static','cache')
 
 """
 known bug:
-weirdly, NUPACK defect function won't work if server from ~ folder. 
-
+weirdly, NUPACK defect function won't work if server start from ~ folder on mac mini.
 """
-
 
 
 class structure_prediction():
@@ -135,7 +134,8 @@ class structure_prediction():
         # misc
         #
         self.header= Div(text=header.default,width=1000,height=40,css_classes=['custom1'])
-        self.plot = Div(text="<h2>Welcome!<br><br>Today is {}.</h2>".format(datetime.datetime.now().strftime("%A, %B %-d")),width=800,height=900)
+        self.plot = Div(text="<h2>Welcome!<br><br>Today is {}.</h2>".format(datetime.datetime.now().strftime("%A, %B %-d")),width=800,height=900,)
+
         self.text = Div(text='',width=800,height=900)
         self.plottab = Tabs(active=0,width=810,height=930,tabs=[Panel(child=self.plot,title='Output1'),Panel(child=self.text,title='Output2'),
                 Panel(child=self.para_settings,title="Parameters")])
@@ -146,6 +146,9 @@ class structure_prediction():
 
         # add callbacks
         self.predict.on_click(self.predict_cb)
+
+        # self.predict.callback=CustomJS(args=dict(plot=self.plot),code="""document.getElementById("Test1234").innerHTML = "whatever" """)
+
         self.tools.on_change('value',self.tools_cb)
         self.method.on_change('value',self.method_cb)
         self.settings.on_change('value',self.settings_cb)
@@ -164,7 +167,6 @@ class structure_prediction():
         self.align=Alignment()
         self.showingplot=True
         self.plotbackend = '.png'
-
 
     def align_cb(self):
         name=self.name.value
@@ -304,8 +306,6 @@ class structure_prediction():
         self.method_cb(1,'old',self.method.value)
         self.method.value=recommendmethod
 
-
-
     def _sequence_cleaner(self,seq):
         seq = seq.strip().split('\n')
         result=[]
@@ -401,7 +401,6 @@ class structure_prediction():
         if len(file_list)>10:
             os.remove(file_list[0])
         return len(file_list)
-
 
     def predict_cb(self,):
         name=self.name.value
@@ -506,7 +505,6 @@ class structure_prediction():
             self.plot.text=str(e)
 
     def update_cofold(self,sequence,para):
-
         ms=Multistrand(*sequence)
         ms.fold(**para)
         title=' '.join(['S'+str(i+1)+':'+"{:.1e}".format(j) for i,j in enumerate(sequence[1])])
@@ -520,18 +518,6 @@ class structure_prediction():
         <caption style="text-align:center;font-family:cursive;font-size:150%">Co-Fold Concentration: {}</caption>
         {}
         """.format(title,ms.to_html('complex_df'))
-
-
-
-
-    #
-    # def multistranddesign(self,title,ssd):
-    #     self.plot.text="""
-    #     <table style="width:100%">
-    #     <caption style="text-align:center;font-family:cursive;font-size:150%">{} Results: ({}/{:.1e})</caption>
-    #     {}
-    #     """.format(title,len(ssd.result),ssd.totalmutation,ssd.to_html())
-
 
 
 helptext="""

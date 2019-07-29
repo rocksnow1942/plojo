@@ -35,7 +35,6 @@ class lazyproperty():
             return value
 
 
-
 class Structure:
     """
     class wrapper around RNAstructure RNA class.
@@ -554,8 +553,6 @@ class Multistrand(Structure):
         result=getattr(self,df).to_html(classes='table',index=True,justify='center',border=0)#.replace('\\n','<br>')
         return result
 
-
-
 class MutableSequence():
     def __init__(self,seed,target=None):
         self.seed=seed
@@ -841,94 +838,6 @@ class StructurePerturbation(SingleStructureDesign):
         df.iloc[0,0]='Original'
         self.df=df
         return df
-
-
-
-class SPT_collector():
-    """
-    container class for dotbracket, probability and tuples
-    this container will only fill in dots thats already initiated.
-    """
-    def __init__(self,order=(1,1,0,1)):
-        self.data={}
-        self.initiated=False
-        self.dataaggregateorder=order
-    def init(self,s,*args):
-        assert len(args)==len(self.dataaggregateorder),('data length must equal dataaggregateorder')
-        self.initiated=True
-        for d,*data in zip(s,*args):
-            if d not in self.data:
-                self.data[d]=list(data)+[1]
-            else:
-                self.add(d,*data)
-
-    def fill(self,seq,s,*args):
-        if self.data or self.initiated:
-            self.intersect(seq,s,*args)
-        else:
-            self.init(s,*args)
-
-    def seq_str_eq(self,seq,s1,s2):
-        for n,s,t in zip(seq,s1,s2):
-            if n=='-':
-                continue
-            else:
-                if s!=t:
-                    return False
-        return True
-
-    def intersect(self,seq,s,*args):
-        self.data={i:j for i,j in self.data.items() if i in s}
-        new = {}
-        for d,*data in zip(s,*args):
-            for k in self.data:
-                if self.seq_str_eq(seq,d,k):
-                    *olddata,count=self.data[k]
-                    new[k]=self.dataaggregate_method(olddata,data,count)
-        self.data=new
-
-    def dataaggregate_method(self,old,new,count):
-        result=[]
-        for a,o,n in zip(self.dataaggregateorder,old,new):
-            if a:
-                result.append((o*count+n)/(count+1))
-            else:
-                result.append(o)
-        return result
-
-    def add(self,d,*data):
-        *olddata,count=self.data[d]
-        self.data[d]=self.dataaggregate_method(olddata,data,count)
-
-    def output(self):
-        s=[k for k,i in self.data.items()]
-        r=[]
-        for z in range(len(self.dataaggregateorder)):
-            r.append([i[z] for k,i in self.data.items()])
-        return (s,*r)
-
-class Design_collector():
-    def __init__(self,limit=100,func=None):
-        self.limit=limit
-        self.func=func
-        self.data=[]
-        self.edge=None
-
-    def add(self,entry):
-        if entry is None:
-            return 0
-        func=self.func
-        # if (self.edge is None) or (func(entry) >= self.edge):
-        self.edge = func(entry)
-        heapq.heappush(self.data,(self.edge,entry))
-        if len(self.data)>self.limit:
-            heapq.heappop(self.data)
-
-    def collect(self):
-        a=[heapq.heappop(self.data) for i in range(len(self.data))]
-        a.reverse()
-        return [i[1] for i in a]
-
 
 class DotGraphConstructor:
     """
@@ -1535,7 +1444,6 @@ class DotGraphConstructor:
             if len(define) > 2:
                 yield [define[2], define[3]]
 
-
 class DotGraph(DotGraphConstructor):
     """
     dot graph, defined by:
@@ -1857,6 +1765,91 @@ class Structure_eq():
     def basepair(self,s1,s2):
         return ViennaRNA.bp_distance(s1,s2) <= self.threshold
 
+class SPT_collector():
+    """
+    container class for dotbracket, probability and tuples
+    this container will only fill in dots thats already initiated.
+    """
+    def __init__(self,order=(1,1,0,1)):
+        self.data={}
+        self.initiated=False
+        self.dataaggregateorder=order
+    def init(self,s,*args):
+        assert len(args)==len(self.dataaggregateorder),('data length must equal dataaggregateorder')
+        self.initiated=True
+        for d,*data in zip(s,*args):
+            if d not in self.data:
+                self.data[d]=list(data)+[1]
+            else:
+                self.add(d,*data)
+
+    def fill(self,seq,s,*args):
+        if self.data or self.initiated:
+            self.intersect(seq,s,*args)
+        else:
+            self.init(s,*args)
+
+    def seq_str_eq(self,seq,s1,s2):
+        for n,s,t in zip(seq,s1,s2):
+            if n=='-':
+                continue
+            else:
+                if s!=t:
+                    return False
+        return True
+
+    def intersect(self,seq,s,*args):
+        self.data={i:j for i,j in self.data.items() if i in s}
+        new = {}
+        for d,*data in zip(s,*args):
+            for k in self.data:
+                if self.seq_str_eq(seq,d,k):
+                    *olddata,count=self.data[k]
+                    new[k]=self.dataaggregate_method(olddata,data,count)
+        self.data=new
+
+    def dataaggregate_method(self,old,new,count):
+        result=[]
+        for a,o,n in zip(self.dataaggregateorder,old,new):
+            if a:
+                result.append((o*count+n)/(count+1))
+            else:
+                result.append(o)
+        return result
+
+    def add(self,d,*data):
+        *olddata,count=self.data[d]
+        self.data[d]=self.dataaggregate_method(olddata,data,count)
+
+    def output(self):
+        s=[k for k,i in self.data.items()]
+        r=[]
+        for z in range(len(self.dataaggregateorder)):
+            r.append([i[z] for k,i in self.data.items()])
+        return (s,*r)
+
+class Design_collector():
+    def __init__(self,limit=100,func=None):
+        self.limit=limit
+        self.func=func
+        self.data=[]
+        self.edge=None
+
+    def add(self,entry):
+        if entry is None:
+            return 0
+        func=self.func
+        # if (self.edge is None) or (func(entry) >= self.edge):
+        self.edge = func(entry)
+        heapq.heappush(self.data,(self.edge,entry))
+        if len(self.data)>self.limit:
+            heapq.heappop(self.data)
+
+    def collect(self):
+        a=[heapq.heappop(self.data) for i in range(len(self.data))]
+        a.reverse()
+        return [i[1] for i in a]
+
 
 def any_difference_of_one(stem, bulge):
     """
@@ -1958,7 +1951,6 @@ def magnitude(vec):
     # return np.linalg.norm(vec) #A lot of overhead, if used for a single vector
     return np.sqrt(np.dot(vec, vec))
 
-
 def vec_distance(vec1, vec2):
     """
     The (euclidean) distance between two points vec1 and vec2.
@@ -1972,7 +1964,6 @@ def vec_distance(vec1, vec2):
     vec2 = np.asarray(vec2)
     direction = vec2 - vec1
     return np.sqrt(np.dot(direction, direction))
-
 
 def _clashfree_annot_pos(pos, coords):
     for c in coords:
@@ -2001,7 +1992,6 @@ def _find_annot_pos_on_circle(nt, coords, cg):
                 return annot_pos
     # print("Annot pos on %s not found." % (str(nt)))
     return None
-
 
 def _annotate_rna_plot(ax, cg, coords, annotations, text_kwargs):
     # Plot annotations
@@ -2197,7 +2187,6 @@ def cluster_and_center(list_of_seq, distance,cluster='hamming',center='energy'):
     result.sort(key=lambda x:np.mean(x[1]))
     return [i[0] for i in result]
 
-
 def findcenter(listofseq,method,clustermethod):
     methods={'hamming':kdistance,'tree':tree_edit_distance,'basepair':basepair_distance}
     func = methods.get(clustermethod,'hamming')
@@ -2211,7 +2200,6 @@ def findcenter(listofseq,method,clustermethod):
     elif method == 'energy':
         return min(listofseq,key = lambda x:x[1])
 
-
 def filterlonelypair(seq_energy_pair):
     res=[]
     for i,j in seq_energy_pair:
@@ -2220,7 +2208,6 @@ def filterlonelypair(seq_energy_pair):
         else:
             res.append((i,j))
     return res
-
 
 def tree_edit_distance(s1,s2,):
     xstruc = ViennaRNA.expand_Full(s1)
@@ -2233,10 +2220,6 @@ def tree_edit_distance(s1,s2,):
 
 def basepair_distance(s1,s2):
     return ViennaRNA.bp_distance(s1,s2)
-
-
-
-
 
 def resolve_pseudoknot(b):
     b=list(b)
