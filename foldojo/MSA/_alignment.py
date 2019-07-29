@@ -23,7 +23,7 @@ def IUPAC_codec(it):
     give a list or string of letters return code.
     """
     seq=set(it)
-    assert seq<=set('ATGCUWSMKRYBDHVN-'),('{} not in IUPAC codes.'.format(seq-set('ATGCUWSMKRYBDHVN-')))
+    assert seq<=set('ATGCUWSMKRYBDHVN-+'),('{} not in IUPAC codes.'.format(seq-set('ATGCUWSMKRYBDHVN-')))
     if len(seq)==1:
         return list(it)[0]
     elif seq==set('AT'):return 'W'
@@ -37,11 +37,12 @@ def IUPAC_codec(it):
     elif seq==set('ACT'): return "H"
     elif seq==set('ACG'): return "V"
     elif seq==set('ATCG'): return "N"
+    elif seq==set('+'):return "+"
     else:
         return IUPAC_codec(seq-set('-')).lower()
 
 def IUPAC_decode(i):
-    assert str(i) in 'ATGCUWSMKRYBDHVN',('{} is not a IUPAC abbrv.'.format(i))
+    assert str(i) in 'ATGCUWSMKRYBDHVN+',('{} is not a IUPAC abbrv.'.format(i))
     code={'W':'AT','S':'CG','K':'GT','M':'AC','Y':'CT','R':'AG','V':'ACG','H':'ACT','D':'AGT','B':'CGT','N':'ATCG'}
     return code.get(i,i)
 
@@ -756,6 +757,8 @@ class Alignment():
     # def to_structure(self,count=True):
     #     saveloc=getattr(self,'save_loc',None)
     #     return Structure(sequence=self.rep_seq(count=count).replace('-',''),name=self.name,save_loc=saveloc)
+
+
 
 
 class Node():

@@ -100,9 +100,9 @@ class Structure:
         kT=8.314*t/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
         kT=np.exp(-1/kT)
         if getattr(self,'_pf',None):
-            Q=kT**self._pf
+            Q=kT**self._pf+1
         else:
-            Q=((kT**(energy)).sum())
+            Q=((kT**(energy)).sum())+1
         return kT**(energy)/Q
 
     @property
@@ -118,9 +118,9 @@ class Structure:
         kT=8.314*t/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
         kT=np.exp(-1/kT)
         if getattr(self,'_pf',None):
-            Q=kT**self._pf
+            Q=kT**self._pf+1
         else:
-            Q=((kT**(energy)).sum())
+            Q=((kT**(energy)).sum())+1
         return kT**(energy)/Q
 
     def print(self,):
@@ -128,17 +128,17 @@ class Structure:
         # pd.options.display.max_colwidth = 500
         result={'Predict':[],'Structure':[],'deltaG':[],'Ratio':[],'ED':[]}
         seq=self.align.format(index=True).replace('\n','<br>')
-        result['Predict'].append('Sequence')
+        result['Predict'].append('Seq.')
         result['Structure'].append('##')
         result['deltaG'].append('')
         result['Ratio'].append('')
         result['ED'].append('')
         for i,(d,e,r,ed) in enumerate(zip(self.dot[0:50],self.energy[0:50],self.ratio[0:50],self.ensembledefect[0:50])):
-            result['Predict'].append('Predict '+str(i+1))
+            result['Predict'].append('Pdct '+str(i+1))
             result['Structure'].append(d)
-            result['deltaG'].append(e)
+            result['deltaG'].append("{:>3},{:>3},{:>3}".format(*e) if isinstance(e,tuple) else str(e))
             result['Ratio'].append('{:.1f}'.format(r*100))
-            result['ED'].append(ed)
+            result['ED'].append("{:>2},{:>2},{:>2}".format(*ed) if isinstance(ed,tuple) else str(ed))
         df = pd.DataFrame(result)
         result=df.to_html(classes='table',index=False,justify='center',border=0).replace('\\n','<br>')
         result=result.replace('##',seq)
@@ -176,16 +176,16 @@ class Structure:
 
     def fold(self,method='RNAstructure',percent=50,**kwargs):
         """
-        method: RNAstructure, ViennaRNA,Compare_RV
+        method: RNAstructure, ViennaRNA,Compare_RVN
         generate all possible dotbrackets
         """
         self.foldpara.update(percent=percent,method=method)
         methods={'RNAstructure':self._RNAstructure_fold,'ViennaRNA':self._ViennaRNA_fold,
-            'Compare_RV':self._compare_method,'Nupack':self._Nupack_fold}
+            'Compare_RVN':self._compare_method,'Nupack':self._Nupack_fold}
         self._dot,self._energy,self._prob,self._pairtuple,self._ensembledefect=methods[method](percent=percent,**kwargs)
          # total suboptimal is the number before restricted by window size, but it is filtered by single pair.
         # self.restrict_fold(so,p,pt,window,maxstr,method)
-        assert len(self._dot)>0,('No structures can be folded.')
+        assert len(self._dot)>0,('No structures can be folded under this condition.')
         return self
 
     def restrict_fold(self,window,cluster='hamming',center='energy',**kwargs):
@@ -219,33 +219,60 @@ class Structure:
         self.dotgraph = [DotGraph(seq,*i,name=f"Predict {k+1}") for k,i in enumerate(zip(dot,self.energy,self.prob,self.pairtuple,self.ensembledefect))]
         return self
 
-    def plot_dot_bracket(self,dotbracket,seq=None,energy=0):
-        # self.totalsuboptimal = 1
-        # self.afterrestrictsuboptimal =1
+    def plot_dot_bracket(self,dotbracket,seq=None,energy=0,**kwargs):
         if seq:
             self.align=Alignment(seq)
         else:
             self.align = Alignment('N'*len(dotbracket))
+
+        # if
+        if len(seq)==1 and (set(seq[0])<=set('ATCGU')):
+            t=kwargs.get('SetTemperature',37)
+            self.foldpara.update(method='ViennaRNA-NUPACK')
+            t=t+273.15
+            kT=8.314*t/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
+            kT=np.exp(-1/kT)
+            ssd = SingleStructureDesign(seed=seq[0],target=dotbracket)
+            seqV,rV,mfeV,eneV,edV = ssd._ViennaRNA_task(seq[0],kT,**kwargs)
+            seqN,rN,mfeN,eneN,edN = ssd._Nupack_task(seq[0],kT,**kwargs)
+            energy = (round(eneV,1),round(eneN,1))
+            ed = "({:.3g},{:.3g})".format(edV,edN)
+            self._pf=min(mfeV,mfeN)
+        else:
+            ed=0
+
         self._dot=[dotbracket]
-        self._energy,self._prob,self._pairtuple,self._ensembledefect=[energy],[[1]*len(dotbracket)],[dotbracket_to_tuple(dotbracket)],[0]
-        
-        
+        self._energy,self._prob,self._pairtuple,self._ensembledefect=[energy],[[1]*len(dotbracket)],[dotbracket_to_tuple(dotbracket)],[ed]
+
     def _Nupack_fold(self,percent,**kwargs):
         self.foldpara.update(kwargs)
         if len(self.align.seq)==1:
             return self._Nupack_fold_(self.align.seq[0],percent,**kwargs)
-        
 
-    def _Nupack_fold_(self,sequence,percent,backbone='rna',**kwargs):
-        sequence=[sequence]
+        sc=SPT_collector(order=(1,1,0,1))
+        for i in self.align.seq:
+            sc.fill(i,*self._Nupack_fold_(i,percent,**kwargs))
+            print('After {}, total structures = {}'.format(i,len(sc.data)))
+        # force save the alifold Algorithm result avoid collison in SPT collector.
+        return sc.output()
+
+    def convert_nupack_para(self,**kwargs):
         dangles=kwargs.get('dangles','some')
         temp=kwargs.get('SetTemperature',37)
         pseudo=kwargs.get('pseudo',False)
+        energypara=kwargs.get('energypara','1995')
+        backbone=kwargs.get('backbone','rna')
+        # multi = True if not pseudo else False
         sodium=kwargs.get('sodium',0.15)
         magnesium=kwargs.get('magnesium',0.002)
+        backbone='dna' if backbone=='dna' else backbone+energypara
+        para=dict(T=temp,material=backbone,pseudo=pseudo,sodium=sodium,magnesium=magnesium,dangles=dangles,)
+        return para
+
+    def _Nupack_fold_(self,sequence,percent,backbone='rna',**kwargs):
+        sequence=[sequence]
         percent=min(percent,40)
-        para=dict(T=temp,material=backbone,pseudo=pseudo,sodium=sodium,magnesium=magnesium,dangles=dangles)
-        
+        para=self.convert_nupack_para(backbone=backbone,**kwargs)
         self._pf=NPK.pfunc(sequence,**para)
         ss,mfe=NPK.mfe(sequence,**para)[0]
         mfe=float(mfe)
@@ -253,18 +280,18 @@ class Structure:
         subopt=NPK.subopt(sequence,enerange,**para)
         prob = NPK.pairs(sequence,cutoff=0.0,**para)
         probdict={(i[0],i[1]):i[2] for i in prob}
-        
-        
         subdot=[i[0] for i in subopt]
+        if para.get('pseudo',False):
+            subdot=[resolve_pseudoknot(i) for i in subdot]
         subene = [round(float(i[1]),1) for i in subopt]
+
         pairtuple = [dotbracket_to_tuple(i) for i in subdot]
-        prob=[[probdict.get(j,0) for j in i] for i in pairtuple]
-        ed = [ NPK.defect(sequence,i) for i in subdot]
+
+        prob=[np.array([probdict.get(j,0) for j in i]) for i in pairtuple]
+
+        ed = [ round(NPK.defect(sequence,i)*100) for i in subdot]
+
         return subdot,subene,prob,pairtuple,ed
-        
-        
-        
-        
 
     def _ViennaRNA_fold(self,percent,**kwargs):
         """
@@ -326,7 +353,7 @@ class Structure:
         # compute partition function to fill DP matrices
         _,self._pf=fc.pf()
         # compute ensemble defect.
-        ed = [round(fc.ensemble_defect(i[0]),3) for i in subopt]
+        ed = [round(fc.ensemble_defect(i[0])*100) for i in subopt]
 
         ss = list()
         num_samples = 10000
@@ -422,21 +449,29 @@ class Structure:
             pairtuples.append(pairtuple)
             allstruct.append(dotbracket)
             allenergy.append(energy)
-            ed.append(round(p.GetEnsembleDefect(i)/len(sequence),3))
+            ed.append(round(p.GetEnsembleDefect(i)/len(sequence)*100))
             probs.append(np.nan_to_num(np.array(prob)))
         return allstruct,allenergy,probs,pairtuples,ed
 
     def _compare_method(self,percent,**kwargs):
-        soV,eV,pV,ptV=self._ViennaRNA_fold(percent,**kwargs)
-        soR,eR,pR,ptR=self._RNAstructure_fold(percent,**kwargs)
-        comS=set(soV) & set(soR)
-        setV=dict(zip(soV,zip(eV,pV,ptV)))
-        setR=dict(zip(soR,zip(eR,pR,ptR)))
+        soV,eV,pV,ptV,edV=self._ViennaRNA_fold(percent,**kwargs)
+        soR,eR,pR,ptR,edR=self._RNAstructure_fold(percent,**kwargs)
+        soN,eN,pN,ptN,edN=self._Nupack_fold(percent,**kwargs)
+        comS=set(soV+soR+soN)
+        setV=dict(zip(soV,zip(eV,pV,ptV,edV)))
+        setR=dict(zip(soR,zip(eR,pR,ptR,edR)))
+        setN=dict(zip(soN,zip(eN,pN,ptN,edN)))
         so_c = list(comS)
-        e_c = [(setR[i][0],setV[i][0]) for i in so_c]
-        p_c = [(setV[i][1]+setR[i][1])/2 for i in so_c]
-        pt_c = [setV[i][2] for i in so_c]
-        return so_c,e_c,p_c,pt_c
+        e_c,p_c,pt_c,ed_c=[],[],[],[]
+        for i in so_c:
+            holder=[]
+            for j in range(4):
+                holder.append((setR.get(i,[0,0,0,0])[j],setV.get(i,[0,0,0,0])[j],setN.get(i,[0,0,0,0])[j]))
+            e_c.append(holder[0])
+            p_c.append(np.mean(holder[1],axis=0))
+            pt_c.append(max(holder[2],key=bool))
+            ed_c.append(holder[3])
+        return so_c,e_c,p_c,pt_c,ed_c
 
     def plot_fold(self,maxcol=100,save=False,showpara=True,**kwargs):
         strutno=len(self.dotgraph)
@@ -479,7 +514,7 @@ class Structure:
             ax=axes[-1]
             ax.set_axis_off()
             text="Folding Parameter:\n"+'\n'.join(["{} : {}".format(k,str(i)) for k,i in self.foldpara.items()])
-            ax.text(0.01,0.85,text, transform=ax.transAxes, fontsize=max(int(3*plot_size),8),verticalalignment='top',family='monospace')
+            ax.text(0.01,0.85,text, transform=ax.transAxes, fontsize=max(int(2*plot_size),6),verticalalignment='top',family='monospace')
         if save:
             plotbackend=kwargs.get('plotbackend','.png')
             save = save if isinstance(save,str) else '2DP_'+self.name
@@ -488,6 +523,34 @@ class Structure:
         else:
             plt.show()
         return figheight,figwidth
+
+
+class Multistrand(Structure):
+    def __init__(self,strands=[],conc=[]):
+        self.strands=strands
+        self.conc=conc
+
+    def fold(self,**kwargs):
+        para=self.convert_nupack_para(**kwargs)
+        para.update(maxcofoldstrand=kwargs.get('maxcofoldstrand',2))
+        result=NPK.complexes(self.strands,self.conc,**para)
+        data1={i:j[-2:] for i,j in result.items()}
+        df1=pd.DataFrame.from_dict(data1,orient='index',columns=['Structure','deltaG'])
+        data2={i:j[:-2] for i,j in result.items()}
+        df2=pd.DataFrame.from_dict(data2,orient='index',columns=['Strands','Q(kcal/mol)','Conc.(M)']).sort_values(by='Conc.(M)',ascending=False)
+        df1=df1.loc[df2.index,:]
+        df1['deltaG']=df1['deltaG'].map('{:.1f}'.format)
+        df2['Q(kcal/mol)']=df2['Q(kcal/mol)'].map('{:.1f}'.format)
+        df2['Conc.(M)']=df2['Conc.(M)'].map('{:.3e}'.format)
+        self.structure_df=df1
+        self.complex_df=df2
+
+    def to_html(self,df='structure_df'):
+        result=getattr(self,df).to_html(classes='table',index=True,justify='center',border=0)#.replace('\\n','<br>')
+        return result
+
+
+
 
 
 class MutableSequence():
@@ -518,8 +581,6 @@ class MutableSequence():
                     seq[j[0]-1]=[j[1]-1]
                 else:
                     seq[j[1]-1]=[j[0]-1]
-
-
         return seq
 
     def mut_iterator(self,n):
@@ -542,7 +603,6 @@ class MutableSequence():
                 result.add(key)
                 yield key
 
-
     def concate(self,a):
         a=list(a)
         for k,i in enumerate(a):
@@ -563,12 +623,12 @@ class SingleStructureDesign(MutableSequence):
         super().__init__(seed,target)
         # self.foldpara={}
 
-    def generate(self,method,top=100,n=10000,**kwargs):
+    def generate(self,method,top=50,n=10000,**kwargs):
         """
         generate random sequence
         """
         # self.foldpara=kwargs
-        methods={'ViennaRNA':self._generate_Vienna,'RNAstructure':self._generate_RNAstructure}
+        methods={'ViennaRNA':self._generate_Vienna,'RNAstructure':self._generate_RNAstructure,'Nupack':self._generate_Nupack}
         if method not in methods.keys():
             raise KeyError ('{} not in supported single strand design Algorithm'.format(method))
         result=methods[method](n,top,**kwargs)
@@ -578,15 +638,32 @@ class SingleStructureDesign(MutableSequence):
         df=pd.DataFrame(result).loc[:,['Predict','Sequence','TgtdG','MFE','Ratio','ED']]
         df['TgtdG']=df['TgtdG'].map('{:.1f}'.format)
         df['MFE']=df['MFE'].map('{:.1f}'.format)
-        df['Ratio']=df['Ratio'].map(partial(round,ndigits=3))
+        df['Ratio']=df['Ratio'].map(partial(round,ndigits=1))
         df['Predict']=df['Predict'].map('Predict {:>2}'.format)
-        df['ED']=df['ED'].map(partial(round,ndigits=3))
+        df['ED']=df['ED'].map(lambda x:round(x*100))
         self.df=df
         return df
 
     def to_html(self):
         result=self.df.to_html(classes='table',index=False,justify='center',border=0)#.replace('\\n','<br>')
         return result
+
+    def _generate_Nupack(self,n,top,**kwargs):
+
+        if "*" in self.target:
+            raise ValueError('* not allowed in Nupack.')
+        total = min(50,int(top/2))
+        task=partial(NPK.design,sequence=self.seed,structure=self.target,**kwargs)
+        sequences = poolwrapper(task,list(range(total)),total=total,showprogress=True,desc='NUPACK Design')
+        t=kwargs.get('SetTemperature',37)
+        kT=8.314*(t+273.15)/4.184e3 # Boltzmann constant * Gas constant then convert kJ to J.
+        kT=np.exp(-1/kT)
+        task2 = partial(self._Nupack_task,kT=kT)
+        tempresult = poolwrapper(task2,sequences,total=total,showprogress=True,desc='NUPACK Evaluate')
+        result=Design_collector(top,lambda x:(x[1],-x[4],-x[3]))
+        for i in tempresult:
+            result.add(i)
+        return result.collect()
 
     def _generate_Vienna(self,n,top,SetTemperature=37,**kwargs):
         if '*' in self.target:
@@ -605,7 +682,7 @@ class SingleStructureDesign(MutableSequence):
                 result.add(i)
         return result.collect()
 
-    def _ViennaRNA_task(self,seq,kT):
+    def _ViennaRNA_task(self,seq,kT,**kwargs):
         fc=ViennaRNA.fold_compound(seq)
         _,gfe = fc.pf()
         _,mfe=fc.mfe()
@@ -614,6 +691,23 @@ class SingleStructureDesign(MutableSequence):
         r = kT**ene/kT**gfe*100
         return (seq,r,mfe,ene,ed)
 
+    def _Nupack_task(self,seq,kT,**kwargs):
+        sequence=[seq]
+        backbone=kwargs.get('backbone','rna')
+        dangles=kwargs.get('dangles','some')
+        temp=kwargs.get('SetTemperature',37)
+        pseudo=kwargs.get('pseudo',False)
+        sodium=kwargs.get('sodium',0.15)
+        magnesium=kwargs.get('magnesium',0.002)
+        para=dict(T=temp,material=backbone,pseudo=pseudo,sodium=sodium,magnesium=magnesium,dangles=dangles)
+        gfe=NPK.pfunc(sequence,**para)
+        ss,mfe=NPK.mfe(sequence,**para)[0]
+        mfe=float(mfe)
+        ene=NPK.energy(sequence,self.target,**para)
+        ed = NPK.defect(sequence,self.target,**para)
+        r = kT**ene/kT**gfe*100
+
+        return (seq,r,mfe,ene,ed)
 
     def _generate_RNAstructure(self,n,top,SetTemperature=37,_rnastru=True,**kwargs):
         """
@@ -637,7 +731,7 @@ class SingleStructureDesign(MutableSequence):
 
         return result.collect()
 
-    def _RNAstructure_task(self,seq,judge,foldmethod,percent,temp,kT):
+    def _RNAstructure_task(self,seq,judge,foldmethod,percent,temp,kT,**kwargs):
         """
         multiprocessing task.
         """
@@ -657,6 +751,12 @@ class SingleStructureDesign(MutableSequence):
             return (seq, sum(r_)*100 ,mfe,min(ene_),np.mean(ed_))
         else:
             return None
+
+
+class MultiStructureDesign(SingleStructureDesign):
+    def generate(self,method='Nupack',top=10,**kwargs):
+        assert method=='Nupack',("\"{}\" is not supported. Only Nupack is supported.".format(method))
+        return SingleStructureDesign.generate(self,method,top=top,**kwargs)
 
 class StructurePerturbation(SingleStructureDesign):
     def __init__(self,seed,target,n,mutrange=None,**kwargs):
@@ -705,6 +805,10 @@ class StructurePerturbation(SingleStructureDesign):
                 yield key
 
     def generate(self,iteration,goal='inhibit',SetTemperature=37,**kwargs):
+        methods={'ViennaRNA':self._ViennaRNA_task,'Nupack':self._Nupack_task}
+        func= methods.get(kwargs['method'],False)
+        if not func: raise KeyError('{} not supported for structure perturbation'.format(kwargs['method']))
+
         t=SetTemperature#self.foldpara.get('SetTemperature',37)
         ViennaRNA.cvar.temperature=t
         t=t+273.15
@@ -715,35 +819,26 @@ class StructurePerturbation(SingleStructureDesign):
         else:
             sorter = lambda x:(x[1],-x[4],-x[3])
         result=Design_collector(50,sorter)
-        task = partial(self._ViennaRNA_task,kT=kT) # return (seq,ratio, mfe, energy)
+
+        task = partial(func,kT=kT,**kwargs) # return (seq,ratio, mfe, energy)
         total = self.totalmutation if iteration > 0.5*self.totalmutation else iteration
         tempresult = poolwrapper(task,self.mut_iterator(iteration),total=total,showprogress=True)
         for i in tempresult:
             result.add(i)
         self.result=result.collect()
-        original = self._ViennaRNA_task(self.seq,kT)
+        original = func(self.seq,kT,**kwargs)
         result = [original] + self.result
         result=dict(zip(['Predict','Sequence','Ratio','MFE','TgtdG','ED'],[list(range(len(result)))]+list(zip(*result))))
         df=pd.DataFrame(result).loc[:,['Predict','Sequence','TgtdG','MFE','Ratio','ED']]
         df['TgtdG']=df['TgtdG'].map('{:.1f}'.format)
         df['MFE']=df['MFE'].map('{:.1f}'.format)
-        df['Ratio']=df['Ratio'].map(partial(round,ndigits=3))
+        df['Ratio']=df['Ratio'].map(partial(round,ndigits=1))
         df['Predict']=df['Predict'].map('Predict {:>2}'.format)
-        df['ED']=df['ED'].map(partial(round,ndigits=3))
+        df['ED']=df['ED'].map(lambda x:round(x*100))
         df.iloc[0,0]='Original'
         self.df=df
         return df
 
-
-
-
-class TowMutableSequence():
-    pass
-
-
-class TwoStructureDesign:
-    def __init__(self,s1,s2,t1,t2):
-        pass
 
 
 class SPT_collector():
@@ -1448,7 +1543,7 @@ class DotGraph(DotGraphConstructor):
     f: five-prime unpaired
     t: three-prime unpaired
     """
-    def __init__(self,seq,dot,energy,prob,pairtuple,ratio=0,name=None):
+    def __init__(self,seq='',dot='',energy=0,prob=[],pairtuple=[],ratio=0,name=None):
         self.seq=seq
         self.prob=prob
         self.dot=dot
@@ -1663,43 +1758,12 @@ class DotGraph(DotGraphConstructor):
             colormapper=scalar_to_rgb(basepairprob+[kwargs.pop('maxprob',0)],bpkwargs.pop('color','cool'))
             for i,j,p in zip(basepairs[:,:,0],basepairs[:,:,1],basepairprob):
                 ax.plot(i,j,color=colormapper(p),**bpkwargs)
-        #
-        # # draw circle and letters
-        # ntcolor=dict(zip('ATGCU',['red','green','yellow','blue','green']))
-        # for i, coord in enumerate(coords):
-        #     nucleotide=self.seq[i]
-        #     circle = plt.Circle((coord[0], coord[1]),
-        #                         edgecolor=ntcolor[nucleotide], radius=2.5,facecolor="white")
-        #     ax.add_artist(circle)
-        #     txtkwargs={"fontweight":"bold","fontsize":6}
-        #     txtkwargs.update(text_kwargs)
-        #     if self.seq:
-        #         ax.annotate(self.seq[i],xy=coord, ha="center", va="center", **txtkwargs )
-
-
 
         # draw circle and letters
         fp = FontProperties(family="monospace", weight='bold')
-        # LETTERS = {"T": TextPath((-1.9, -2.2), "T", size=6, prop=fp),
-        #            "G": TextPath((-2, -2), "G", size=6, prop=fp),
-        #            "A": TextPath((-2, -2), "A", size=6, prop=fp),
-        #            "C": TextPath((-2, -2), "C", size=6, prop=fp),
-        #            "U":TextPath( (-2, -2.1), "U", size=6, prop=fp),
-        #            "W":TextPath( (-2, -2.1), "W", size=6, prop=fp),
-        #            "S":TextPath( (-2, -2.1), "S", size=6, prop=fp),
-        #            "M":TextPath( (-2, -2.1), "M", size=6, prop=fp),
-        #            "K":TextPath( (-2, -2.1), "K", size=6, prop=fp),
-        #            "R":TextPath( (-2, -2.1), "R", size=6, prop=fp),
-        #            "Y":TextPath( (-2, -2.1), "Y", size=6, prop=fp),
-        #            "B":TextPath( (-2, -2.1), "B", size=6, prop=fp),
-        #            "D":TextPath( (-2, -2.1), "D", size=6, prop=fp),
-        #            "H":TextPath( (-2, -2.1), "H", size=6, prop=fp),
-        #            "V":TextPath( (-2, -2.1), "V", size=6, prop=fp),
-        #            "N":TextPath( (-2, -2.1), "N", size=6, prop=fp),
-        #            "-":TextPath( (-2, -2.1), "-", size=6, prop=fp),
-        #            }
+
         vocal="ATGCUWSMKRYBDHVN"
-        LETTERS = {i:TextPath( (-2, -2), i.upper(), size=6, prop=fp ) for i in vocal+vocal.lower()+'-'}
+        LETTERS = {i:TextPath( (-2, -2), i.upper(), size=6, prop=fp ) for i in vocal+vocal.lower()+'-+'}
         def default():
             return 'black'
         ntcolor=defaultdict(default)
@@ -1750,8 +1814,9 @@ class DotGraph(DotGraphConstructor):
         # width = datalim[1][0] - datalim[0][0]
         # height = datalim[1][1] - datalim[0][1]
         # print(width,height)
-        energy = "({:.1f},{:.1f})".format(*self.energy) if isinstance(self.energy,tuple) else round(self.energy,1)
-        ax.set_title("{}, dG={}, ED={}".format(self.name,energy,self.ratio))
+        energy = "{:.1f},{:.1f},{:.1f}".format(*self.energy) if isinstance(self.energy,tuple) else round(self.energy,1)
+        edratio="{},{},{}".format(*self.ratio) if isinstance(self.ratio,tuple) else self.ratio
+        ax.set_title("{}, dG={}, ED={}".format(self.name,energy,edratio))
         ax.set_aspect('equal', 'datalim')
         ax.update_datalim(datalim)
         ax.autoscale_view()
@@ -2055,13 +2120,15 @@ def dotbracket_to_tuple(struct):
     """
     Converts arbitrary structure in dot bracket format to pair table (ViennaRNA format).
     """
+    struct=struct.replace("+",'.')
+
     bracket_left = "([{<ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     bracket_right = ")]}>abcdefghijklmnopqrstuvwxyz"
 
     if len(struct) == 0:
         raise ValueError("Cannot convert empty structure to pairtable")
-    pt = [0] * ((len(struct) + 1) - struct.count("&"))
-    pt[0] = len(struct) - struct.count("&")
+    pt = [0] * ((len(struct) + 1) - struct.count("+"))
+    pt[0] = len(struct) - struct.count("+")
 
     stack = defaultdict(list)
     inverse_bracket_left = dict(zip(bracket_left,range(len(bracket_left))))
@@ -2069,7 +2136,7 @@ def dotbracket_to_tuple(struct):
 
     i = 0
     for a in struct:
-        if a == '&':
+        if a == '+':
             continue
         i += 1
         # print i,a, pt
@@ -2123,8 +2190,8 @@ def cluster_and_center(list_of_seq, distance,cluster='hamming',center='energy'):
         else:
             result[temp].append((i,e))
 
-    result=[ findcenter(j,method=center,clustermethod=cluster) for i,j in result.items()]
-    result.sort(key=lambda x:x[1])
+    result=[findcenter(j,method=center,clustermethod=cluster) for i,j in result.items()]
+    result.sort(key=lambda x:np.mean(x[1]))
     return [i[0] for i in result]
 
 
@@ -2163,3 +2230,47 @@ def tree_edit_distance(s1,s2,):
 
 def basepair_distance(s1,s2):
     return ViennaRNA.bp_distance(s1,s2)
+
+
+
+
+
+def resolve_pseudoknot(b):
+    b=list(b)
+    indi=[0,0]
+    temp=0
+    startcount=False
+    for i,j in enumerate(b):
+        indi[1]=i
+        if j=='{' and b[i+1]!='{':
+            indi[0]=i
+            startcount=True
+            temp=0
+            continue
+        else:
+            if startcount:
+                if j=='{':
+                    indi[0]=i
+                    temp=0
+                    startcount=False
+                elif j=='.':
+                    continue
+                elif j=='(':
+                    temp+=1
+                elif j==')':
+                    temp-=1
+                else:
+                    if temp ==0:
+                        break
+                    else:
+                        indi[0]=i
+                        temp=0
+                        startcount=False
+            else:
+                indi[0]=i
+    if indi[0]==indi[1]:
+        return ''.join(b)
+    else:
+        b[indi[0]]='('
+        b[indi[1]]=')'
+        return resolve_pseudoknot(b)
