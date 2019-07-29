@@ -506,12 +506,11 @@ def defect(sequences, structure, ordering=None, material='rna',
                          dangles=dangles, T=T, multi=True, pseudo=pseudo)
   if mfe:
       args += ['-mfe']
-  print(args)
-  print(cmd_input)
+
   ## Perform call
   #
-  args=['defect', '-material', 'rna', '-sodium', 1.0, '-magnesium', 0.0, '-dangles', 'some', '-T', 37]
-  cmd_input="1\nACCCTTATTTGCGTAGCATTTTGCGAGTGAGTCGGATCTCCGCATATCTGCG\n1\n ......(((.(((........))).)))(((......)))((((....))))"
+  # args=['defect', '-material', 'rna', '-sodium', 1.0, '-magnesium', 0.0, '-dangles', 'some', '-T', 37]
+  # cmd_input="1\nACCCTTATTTGCGTAGCATTTTGCGAGTGAGTCGGATCTCCGCATATCTGCG\n1\n ......(((.(((........))).)))(((......)))((((....))))"
 
   output, error = call_with_pipe(args, cmd_input)
 
