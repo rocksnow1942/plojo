@@ -22,7 +22,6 @@ import NUPACK as NPK
 pd.options.display.max_colwidth = 500
 
 
-
 class lazyproperty():
     def __init__(self,func):
         self.func=func
@@ -270,8 +269,11 @@ class Structure:
         return para
 
     def _Nupack_fold_(self,sequence,percent,backbone='rna',**kwargs):
+        length=len(sequence)
+        percent *=0.5**(max(length-80,0)/10)
         sequence=[sequence]
         percent=min(percent,40)
+        self.foldpara['percent']=round(percent,1)
         para=self.convert_nupack_para(backbone=backbone,**kwargs)
         self._pf=NPK.pfunc(sequence,**para)
         ss,mfe=NPK.mfe(sequence,**para)[0]
@@ -312,6 +314,9 @@ class Structure:
         """
         use ViennaRNA for prediction.
         """
+        length=len(sequence)
+        percent *=0.5**(max(length-80,0)/10) # reduce percentage every 15 nt longer
+        self.foldpara['percent']=round(percent,1)
         single=kwargs.get('ForceSingleStranded',None)
         double=kwargs.get('ForceDoubleStranded',None)
         pair=kwargs.get('ForcePair',None)
@@ -548,8 +553,6 @@ class Multistrand(Structure):
     def to_html(self,df='structure_df'):
         result=getattr(self,df).to_html(classes='table',index=True,justify='center',border=0)#.replace('\\n','<br>')
         return result
-
-
 
 
 

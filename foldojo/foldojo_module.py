@@ -14,7 +14,7 @@ cache_loc=path.join(path.dirname(__file__),'static','cache')
 
 """
 known bug:
-
+weirdly, NUPACK defect function won't work if server from ~ folder. 
 
 """
 
@@ -506,7 +506,7 @@ class structure_prediction():
             self.plot.text=str(e)
 
     def update_cofold(self,sequence,para):
-        
+
         ms=Multistrand(*sequence)
         ms.fold(**para)
         title=' '.join(['S'+str(i+1)+':'+"{:.1e}".format(j) for i,j in enumerate(sequence[1])])

@@ -33,8 +33,8 @@ Need to put NUPACK executables in
 '/usr/local/nupack3.0.6'
 """
 
-# filepath=os.path.dirname(__file__)
-# os.environ['PATH']+=(':'+os.path.join(filepath,'bin'))
+filepath=os.path.dirname(__file__)
+os.environ['PATH']+=(':'+filepath)
 # os.environ['NUPACKHOME']='/usr/local/nupack3.0.6'
 
 
@@ -51,13 +51,13 @@ def dGadjust(T, N):
 def get_nupack_exec_path(exec_name):
   """ If the NUPACKHOME environment variable is set, use that as the directory
   of the NUPACK executables. Otherwise, have Python search the PATH directly. """
-  # if 'NUPACKHOME' in os.environ:
-  #   if('3.0' in os.environ['NUPACKHOME']):
-  #       return os.environ['NUPACKHOME'] + '/bin/' + exec_name
-  #   if('3.2' in os.environ['NUPACKHOME']):
-  #       return os.environ['NUPACKHOME'] + '/build/bin/' + exec_name
-  # else:
-  return exec_name
+  if 'NUPACKHOME' in os.environ:
+    if('3.0' in os.environ['NUPACKHOME']):
+        return os.environ['NUPACKHOME'] + '/bin/' + exec_name
+    if('3.2' in os.environ['NUPACKHOME']):
+        return os.environ['NUPACKHOME'] + '/build/bin/' + exec_name
+  else:
+    return exec_name
 
 
 def setup_args(**kargs):
@@ -500,10 +500,10 @@ def defect(sequences, structure, ordering=None, material='rna',
 
   ## Set up command-line arguments and input
   args, cmd_input = \
-      setup_nupack_input(exec_name='defect', sequences=sequences, ordering=ordering,
-                         structure=structure, material=material,
-                         sodium=sodium, magnesium=magnesium,
-                         dangles=dangles, T=T, multi=True, pseudo=pseudo)
+      setup_nupack_input(exec_name='defect', sequences=list(sequences), ordering=None,
+                         structure=structure, material='rna',
+                         sodium=1, magnesium=0,
+                         dangles='some', T=37, multi=True, pseudo=False)
   if mfe:
       args += ['-mfe']
 
@@ -513,13 +513,11 @@ def defect(sequences, structure, ordering=None, material='rna',
   # cmd_input="1\nACCCTTATTTGCGTAGCATTTTGCGAGTGAGTCGGATCTCCGCATATCTGCG\n1\n ......(((.(((........))).)))(((......)))((((....))))"
 
   output, error = call_with_pipe(args, cmd_input)
-
   ## Parse and return output
   # can't figure out why, but occasionally NUPACK returns empty-handed.  Subsequent tries seem to work...
   if len(output) < 4:
 
     return 1
-  print(output)
   if "% Ensemble defect" not in output[-4] and \
           "% Fraction of correct nucleotides vs. MFE" not in output[-4]:
     # print('defect')
@@ -527,6 +525,12 @@ def defect(sequences, structure, ordering=None, material='rna',
 
   # We don't return the normalized ensemble defect, because that is easily calculable on your own
   return float(output[-2])
+
+
+# t=['ACCCTTATTTGCGTAGCATTTTGCGAGTGAGTCGGATCTCCGCATATCTGCG']
+# s= '......(((.(((........))).)))(((......)))((((....))))'
+# a=defect(t,s)
+# print(a)
 
 
 def sample(sequences, samples, ordering=None, material='rna',
