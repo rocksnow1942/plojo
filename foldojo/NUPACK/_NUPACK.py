@@ -51,13 +51,13 @@ def dGadjust(T, N):
 def get_nupack_exec_path(exec_name):
   """ If the NUPACKHOME environment variable is set, use that as the directory
   of the NUPACK executables. Otherwise, have Python search the PATH directly. """
-  if 'NUPACKHOME' in os.environ:
-    if('3.0' in os.environ['NUPACKHOME']):
-        return os.environ['NUPACKHOME'] + '/bin/' + exec_name
-    if('3.2' in os.environ['NUPACKHOME']):
-        return os.environ['NUPACKHOME'] + '/build/bin/' + exec_name
-  else:
-      return exec_name
+  # if 'NUPACKHOME' in os.environ:
+  #   if('3.0' in os.environ['NUPACKHOME']):
+  #       return os.environ['NUPACKHOME'] + '/bin/' + exec_name
+  #   if('3.2' in os.environ['NUPACKHOME']):
+  #       return os.environ['NUPACKHOME'] + '/build/bin/' + exec_name
+  # else:
+  return exec_name
 
 
 def setup_args(**kargs):
@@ -503,10 +503,16 @@ def defect(sequences, structure, ordering=None, material='rna',
       setup_nupack_input(exec_name='defect', sequences=sequences, ordering=ordering,
                          structure=structure, material=material,
                          sodium=sodium, magnesium=magnesium,
-                         dangles=dangles, T=T, multi=multi, pseudo=pseudo)
+                         dangles=dangles, T=T, multi=True, pseudo=pseudo)
   if mfe:
       args += ['-mfe']
+  print(args)
+  print(cmd_input)
   ## Perform call
+  #
+  args=['defect', '-material', 'rna', '-sodium', 1.0, '-magnesium', 0.0, '-dangles', 'some', '-T', 37]
+  cmd_input="1\nACCCTTATTTGCGTAGCATTTTGCGAGTGAGTCGGATCTCCGCATATCTGCG\n1\n ......(((.(((........))).)))(((......)))((((....))))"
+
   output, error = call_with_pipe(args, cmd_input)
 
   ## Parse and return output
@@ -514,7 +520,7 @@ def defect(sequences, structure, ordering=None, material='rna',
   if len(output) < 4:
 
     return 1
-
+  print(output)
   if "% Ensemble defect" not in output[-4] and \
           "% Fraction of correct nucleotides vs. MFE" not in output[-4]:
     # print('defect')
