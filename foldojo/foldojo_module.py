@@ -415,9 +415,9 @@ class structure_prediction():
             ct.update(sequence=sequence,name=name,backend=backend,mode=mode)
 
             if ct == self.fold_status:
-                self.plot.text="""
-                <img src="foldojo/static/cache/{}"  hspace='20' height='{:.0f}' width='{:.0f}'>
-                """.format(*self.last_predict)
+                # self.plot.text="""
+                # <img src="foldojo/static/cache/{}"  hspace='20' height='{:.0f}' width='{:.0f}'>
+                # """.format(*self.last_predict)
                 return 0
 
             # only creaet new structure if sequence and key parameters changed.
@@ -441,6 +441,7 @@ class structure_prediction():
             if plotnew:
                 lengthlist=[len(i) for i in sequence]
                 if mode == 'cofold':
+                    self.fold_status=ct
                     return self.update_cofold(sequence,para)
                 elif mode == 'default':
                     assert max(lengthlist) == min(lengthlist), ('input sequence not same length')
