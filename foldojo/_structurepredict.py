@@ -269,7 +269,7 @@ class Structure:
 
     def _Nupack_fold_(self,sequence,percent,backbone='rna',**kwargs):
         length=len(sequence)
-        percent *=0.5**(max(length-80,0)/10)
+        percent *=0.5**(max(length-50,0)/10)
         sequence=[sequence]
         percent=min(percent,40)
         self.foldpara['percent']=round(percent,1)
