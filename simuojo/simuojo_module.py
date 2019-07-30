@@ -970,7 +970,7 @@ class structure_prediction():
         <h2>Secondary Structure Prediction</h2>
         <h3>Go To Foldojo Server<a href='http://plojo.lan:5006/foldojo'> http://plojo.lan:5006/foldojo <a></h3>
         """
-        self.plot = Div(text=self.text,width=800,height=900)
+        self.plot = Div(text=self.text,width=800,height=200)
         bottom= Div(text="""
         <p align='center'><a href='http://www.aptitudemedical.com'>Aptitude Medical Systems, Inc.<a></p>
         """,width=800,height=50)

@@ -85,13 +85,14 @@ def simu_sele_cb(attr,old,new):
        <span style="color:#FF00BF">ojo </span>
        &#129322
        </h1>
-        """,width=1000,height=40)
+        """,width=600,height=40)
         temp = layout([temp],*structlayout)
         select_layout.children = temp.children
 
 #<span style="color:#FF00BF"></span>
 
+structlayout=structure_prediction().layout
 simu_sele.on_change('value',simu_sele_cb)
-select_layout=layout([row(model_display,simu_sele)])
+select_layout=layout([row(model_display,simu_sele)],*structlayout)
 
 curdoc().add_root(select_layout)
