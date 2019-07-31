@@ -314,7 +314,8 @@ class Structure:
         use ViennaRNA for prediction.
         """
         length=len(sequence)
-        percent *=0.5**(max(length-80,0)/10) # reduce percentage every 15 nt longer
+        percent *=0.5**(max(length-60,0)/10)
+        percent = min(50,percent) # reduce percentage every 15 nt longer
         self.foldpara['percent']=round(percent,1)
         single=kwargs.get('ForceSingleStranded',None)
         double=kwargs.get('ForceDoubleStranded',None)
