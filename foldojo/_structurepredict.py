@@ -19,10 +19,19 @@ import heapq
 import pandas as pd
 import NUPACK as NPK
 
+"""
+Note:
+the algorithms used are from NUPACK, ViennaRNA and RNAstructure.
+these programs should be build for specific systems, otherwise it won't work.
+"""
+
 pd.options.display.max_colwidth = 500
 
 
 class lazyproperty():
+    """
+    lazy property descriptor class.
+    """
     def __init__(self,func):
         self.func=func
 
@@ -37,18 +46,22 @@ class lazyproperty():
 
 class Structure:
     """
-    class wrapper around RNAstructure RNA class.
-    then can fold and plot 2D structure.
-    all predicted data in _dot, _energy, _prob, _pairtuple
-    restricted data in dot, energy, prob, pairtuple
+    main class for structure prediction.
+    provides 3 different algorithms and compare them.
     """
     def __init__(self,align='',name=None,save_loc=None):
+        """
+        sequence is stored in Alignment class.
+        """
         self.align=align if isinstance(align,Alignment) else Alignment(align,name=name)
         self.name=name or self.align.name
         self.foldpara={}
         if save_loc:self.save_loc=save_loc
 
     def ifexist(self,name):
+        """
+        for saving files.
+        """
         savefolder=getattr(self,"save_loc",getcwd())
         if not path.isdir(savefolder):
             makedirs(savefolder)
@@ -66,24 +79,43 @@ class Structure:
             return path.join(savefolder,name)
 
     def __len__(self):
+        """
+        return sequence length in the Alignment class.
+        """
         return len(self.align)
 
     @lazyproperty
     def seq(self):
+        """
+        return seuqnce
+        """
         return self.align.rep_seq()
 
     @lazyproperty
     def iupac(self):
+        """
+        return IPUAC notation of all sequences.
+        """
         return self.align.iupac()
 
     @property
     def seq_length(self):
+        """
+        counts of how many sequences are there.
+        """
         return len(self.seq)
     @property
     def totalsuboptimal(self):
+        """
+        return how many total suboptimal structures are predicted.
+        """
         return len(self._dot)
+
     @property
     def afterrestrictsuboptimal(self):
+        """
+        return how many suboptimal structures after restriction is applyed (not include max strucutre limit)
+        """
         return len(self.dot)
 
     @property
@@ -122,8 +154,9 @@ class Structure:
         return kT**(energy)/Q
 
     def print(self,):
-        # &nbsp
-        # pd.options.display.max_colwidth = 500
+        """
+        return table in html format
+        """
         result={'Predict':[],'Structure':[],'deltaG':[],'Ratio':[],'ED':[]}
         seq=self.align.format(index=True).replace('\n','<br>')
         result['Predict'].append('Seq.')
@@ -175,7 +208,7 @@ class Structure:
     def fold(self,method='RNAstructure',percent=50,**kwargs):
         """
         method: RNAstructure, ViennaRNA,Compare_RVN
-        generate all possible dotbrackets
+        generate all possible dotbrackets structures
         """
         self.foldpara.update(percent=percent,method=method)
         methods={'RNAstructure':self._RNAstructure_fold,'ViennaRNA':self._ViennaRNA_fold,
@@ -189,8 +222,14 @@ class Structure:
     def restrict_fold(self,window,cluster='hamming',center='energy',**kwargs):
         """
         restrict fold to certain ones.
-        cluster : cluster method
-        center :
+        cluster : cluster method, can be
+        hamming:hamming distance
+        or
+        basepair: basepair distance
+        or
+        tree: tree_edit_distance
+        center : the remaining structure selected based on what method: can energy or distance.
+        if distance is selected, will use the cluster method for distance calculation.
         """
         self.foldpara.update(window=window)
         so,p,pt,energy,ed=self._dot,self._prob,self._pairtuple,self._energy,self._ensembledefect
@@ -205,6 +244,7 @@ class Structure:
     def init_dotgraph(self,maxstr=8,repseq='iupac',**kwargs):
         """
         initialize dotgraph, notate by either Frequency  or IUPAC notation
+        default is using IPUAC notation.
         """
         if repseq=='frequency':
             seq=self.seq
@@ -218,6 +258,11 @@ class Structure:
         return self
 
     def plot_dot_bracket(self,dotbracket,seq=None,energy=0,**kwargs):
+        """
+        method to take a single dotbracket structure and sequence to plot its structure.
+        will automatically calculate it's predicted energy and other FontProperties
+        using ViennaRNA and Nupack if sequence information is provided.
+        """
         if seq:
             self.align=Alignment(seq)
         else:
@@ -243,6 +288,11 @@ class Structure:
         self._energy,self._prob,self._pairtuple,self._ensembledefect=[energy],[[1]*len(dotbracket)],[dotbracket_to_tuple(dotbracket)],[ed]
 
     def _Nupack_fold(self,percent,**kwargs):
+        """
+        use nupack algorithm to fold. result is returned in the format
+        of tuple of lists in the order of:
+        dotbracket structure,energy,probability,pairtuple,ensemble defect.
+        """
         self.foldpara.update(kwargs)
         if len(self.align.seq)==1:
             return self._Nupack_fold_(self.align.seq[0],percent,**kwargs)
@@ -255,6 +305,9 @@ class Structure:
         return sc.output()
 
     def convert_nupack_para(self,**kwargs):
+        """
+        convert paramters for NUPACK inputs. nupack is using command line inputs.
+        """
         dangles=kwargs.get('dangles','some')
         temp=kwargs.get('SetTemperature',37)
         pseudo=kwargs.get('pseudo',False)
@@ -268,6 +321,11 @@ class Structure:
         return para
 
     def _Nupack_fold_(self,sequence,percent,backbone='rna',**kwargs):
+        """
+        invokes real prediction using nupack.
+        give the sequence and return tuple of lists in the order of:
+        dotbracket structure,energy,probability,pairtuple,ensemble defect.
+        """
         length=len(sequence)
         percent *=0.5**(max(length-50,0)/10)
         sequence=[sequence]
@@ -296,7 +354,7 @@ class Structure:
 
     def _ViennaRNA_fold(self,percent,**kwargs):
         """
-        wrapper to handle aligment multiple sequence.
+        use ViennaRNA RNA to fold. same result format as Nupack fold.
         """
         self.foldpara.update(kwargs)
         if len(self.align.seq)==1:
@@ -459,6 +517,10 @@ class Structure:
         return allstruct,allenergy,probs,pairtuples,ed
 
     def _compare_method(self,percent,**kwargs):
+        """
+        get the collection of all possible structures predicted by 3 different algorithms.
+        use average energy to rank the suboptimal structures.
+        """
         soV,eV,pV,ptV,edV=self._ViennaRNA_fold(percent,**kwargs)
         soR,eR,pR,ptR,edR=self._RNAstructure_fold(percent,**kwargs)
         soN,eN,pN,ptN,edN=self._Nupack_fold(percent,**kwargs)
@@ -479,6 +541,9 @@ class Structure:
         return so_c,e_c,p_c,pt_c,ed_c
 
     def plot_fold(self,maxcol=100,save=False,showpara=True,**kwargs):
+        """
+        generate plot of the dotgraph.
+        """
         strutno=len(self.dotgraph)
         plot_size =max(self.dotgraph[0].plot_size())/200*4.5 # this is estimating size of each panel
         plot_size=max(plot_size,4)
@@ -531,11 +596,20 @@ class Structure:
 
 
 class Multistrand(Structure):
+    """
+    sub-class to handle co-fold:
+    folding of multiple structures.
+    give the predicted complex concentrations and their optimal structures.
+    only use Nupack algorithm.
+    """
     def __init__(self,strands=[],conc=[]):
         self.strands=strands
         self.conc=conc
 
     def fold(self,**kwargs):
+        """
+        use nupack complexes function to fold complexes.
+        """
         para=self.convert_nupack_para(**kwargs)
         para.update(maxcofoldstrand=kwargs.get('maxcofoldstrand',2))
         result=NPK.complexes(self.strands,self.conc,**para)
@@ -555,6 +629,10 @@ class Multistrand(Structure):
         return result
 
 class MutableSequence():
+    """
+    class to generate mutations given a IPUAC notated seed and target
+    structure. will try to put base pairs or wobble pairs at pairing sites.
+    """
     def __init__(self,seed,target=None):
         self.seed=seed
         self.target=target or '.'*len(self.seed)
@@ -620,6 +698,9 @@ class MutableSequence():
 
 
 class SingleStructureDesign(MutableSequence):
+    """
+    class to design single strand structure using different algorithms.
+    """
     def __init__(self,seed,target,**kwargs):
         super().__init__(seed,target)
         # self.foldpara={}
@@ -1735,6 +1816,10 @@ class DotGraph(DotGraphConstructor):
         ax.set_axis_off()
 
 class Structure_eq():
+    """
+    class to judge if two structures are equal using various methods
+    this class can be used as a function.
+    """
     def __init__(self,method,threshold=None):
         self.method=method
         self.threshold=threshold
@@ -1830,6 +1915,13 @@ class SPT_collector():
         return (s,*r)
 
 class Design_collector():
+    """
+    collector class for designed structures and their associated FontProperties,
+    such as energy and etc.
+    a limit is set at beginning to limit max capacity of the class.
+    a function can be passed to determine which entries will be retained after overfilled
+    the class..
+    """
     def __init__(self,limit=100,func=None):
         self.limit=limit
         self.func=func
@@ -2157,14 +2249,23 @@ def dotbracket_to_tuple(struct):
     return tuples
 
 def ensemble_to_prob(ensemble):
+    """
+    convert a ensemble of dotbrackets to probability of each pair
+    """
     ens=np.array([ [k!='.' for k in i] for i in ensemble],int)
     ens=ens.mean(axis=0)
     return ens
 
 def kdistance(s1,s2):
+    """
+    calculate hamming distance.
+    """
     return sum([i!=j for i,j in zip(s1,s2)])
 
 def cluster_and_center(list_of_seq, distance,cluster='hamming',center='energy'):
+    """
+    use different methods to cluster structures and pick the center of each cluster.
+    """
     if not distance:
         list_of_seq.sort(key=lambda x:x[1])
         return [i[0] for i in list_of_seq]
@@ -2189,6 +2290,9 @@ def cluster_and_center(list_of_seq, distance,cluster='hamming',center='energy'):
     return [i[0] for i in result]
 
 def findcenter(listofseq,method,clustermethod):
+    """
+    find the center of a cluster using different methods.
+    """
     methods={'hamming':kdistance,'tree':tree_edit_distance,'basepair':basepair_distance}
     func = methods.get(clustermethod,'hamming')
     if method=='distance':
@@ -2202,6 +2306,9 @@ def findcenter(listofseq,method,clustermethod):
         return min(listofseq,key = lambda x:x[1])
 
 def filterlonelypair(seq_energy_pair):
+    """
+    remove structures that have lone pairs.
+    """
     res=[]
     for i,j in seq_energy_pair:
         if '.).' in i or '.(.' in i:
@@ -2211,6 +2318,9 @@ def filterlonelypair(seq_energy_pair):
     return res
 
 def tree_edit_distance(s1,s2,):
+    """
+    calculate tree_edit_distance
+    """
     xstruc = ViennaRNA.expand_Full(s1)
     T1 = ViennaRNA.make_tree(xstruc)
     xstruc = ViennaRNA.expand_Full(s2)
@@ -2220,9 +2330,20 @@ def tree_edit_distance(s1,s2,):
     return tree_dist
 
 def basepair_distance(s1,s2):
+    """
+    calculate basepair distance.
+    """
     return ViennaRNA.bp_distance(s1,s2)
 
 def resolve_pseudoknot(b):
+    """
+    sometimes Nupack pseudoknot structure is not noted correctly.
+    this resolves it.
+    e.g.
+    ((({{{...}}})))
+    will convert to be
+    ((((((...))))))
+    """
     b=list(b)
     indi=[0,0]
     temp=0

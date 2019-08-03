@@ -1,12 +1,7 @@
 import os,glob
 from os import path
-# import shelve
-# from bokeh.models import HoverTool,Slider,RangeSlider
 from bokeh.models.widgets import Button, TextInput,Div,TextAreaInput,Select,Dropdown, CheckboxGroup,PreText,Tabs,Panel
 from bokeh.layouts import widgetbox,column,row,layout
-# from bokeh.models import CustomJS
-# import numpy as np
-# from simu_utils import file_save_location,file_name
 from _structurepredict import Structure,SingleStructureDesign,StructurePerturbation,MultiStructureDesign,Multistrand
 import datetime
 from MSA import Alignment, buildMSA
@@ -19,7 +14,66 @@ weirdly, NUPACK defect function won't work if server start from ~ folder on mac 
 """
 
 
+class Header():
+    def __init__(self):
+        self.template="""
+        <style>
+        h1 {{
+          position: relative;
+          animation: mymove 2s;
+          animation-iteration-count: infinite;
+        }}
+
+        @keyframes mymove {{
+        0%  {{ border:4px outset #81F7F3;  }}
+        20% {{ border:4px outset #81F7F3; }}
+        50% {{ border:4px outset #ff66ff; }}
+        70% {{ border:4px outset #81F7F3; }}
+        100%{{ border:4px outset #81F7F3;}}
+        }}
+        </style>
+        <h1 style="width:1050px;height:50px;border: 4px outset #81F7F3;text-align:center;font-family:cursive;font-size:230%;color:#FF00BF;background-color:{color}"">
+        &#128540
+        <span style="color:#0000FF">F</span>
+        <span style="color:red">O</span>
+        <span style="color:#FFFF00">L</span>
+        <span style="color:#31B404">D</span>
+        <span style="color:#FF00BF">ojo </span>
+        &#129322
+        {subtitle}
+        </h1>
+        """
+
+    @property
+    def default(self):
+        return self.template.format(subtitle='',color='#81F7F3')
+    @property
+    def plot(self):
+        return self.template.format(subtitle='Plot Structure Mode',color='#088A85')
+    @property
+    def exclusion(self):
+        return self.template.format(subtitle='Structure Exclusion Mode',color='#0404B4')
+    @property
+    def single(self):
+        return self.template.format(subtitle='Single Strand Design Mode',color='#2EFE2E')
+    @property
+    def multi(self):
+        # two strand design
+        return self.template.format(subtitle='Multi-Strand Design',color='#100719')
+    @property
+    def cofold(self):
+        return self.template.format(subtitle='Co-Fold of Multiple Sequences',color='#FE9A2E')
+    @property
+    def perturb(self):
+        return self.template.format(subtitle='Structure Perturbation Mode',color='#F5A9D0')
+
+header=Header()
+
+
 class structure_prediction():
+    """
+    class that gives the layout of foldojo
+    """
     def __init__(self):
         #parameters default
         width=125
@@ -169,6 +223,10 @@ class structure_prediction():
         self.plotbackend = '.png'
 
     def align_cb(self):
+        """
+        call back function for align button.
+        align funciton is only supported in two mode: default and exclusion mode.
+        """
         name=self.name.value
         backend=self.plotbackend
         mode = self.tool_mode
@@ -222,24 +280,40 @@ class structure_prediction():
             self.plot.text=str(e)
 
     def settings_cb(self,attr,old,new):
+        """
+        settings button callback, offers change plot format and help.
+        """
         if new in ['.png','.svg','dot']:
             self.plotbackend = new
             return 0
         elif new =='help':
-            self.plot.text=helptext
+            self.plot.text=helptext[self.tool_mode]
         self.settings.value=old
 
-    def viennainputtoggle(self,onoroff):
-        self.inputa_backbone.disabled=onoroff
-        self.inputi_ForceProhibitPair.disabled=onoroff
+    def method_toggle(self,method):
+        """
+        selection available parameters option based on algorithm selection.
+        """
+        inputs=self.parainputs
+        def toggle(*methods):
+            for i,j in zip(inputs,methods):
+                i.disabled=bool(j)
+        if method=='ViennaRNA':
+            toggle(1,0,0,0,0,0,0,0,1)
+        elif method=='RNAstructure':
+            toggle(0,0,0,0,0,0,0,0,0)
+        elif method=='Nupack':
+            toggle(0,0,0,0,0,1,1,1,1)
+        else:
+            toggle(0,0,0,0,0,0,0,0,0)
+
 
     def method_cb(self,attr,old,new):
-
-        if new=='ViennaRNA':
-            self.viennainputtoggle(True)
-        else:
-            self.viennainputtoggle(False)
-
+        """
+        prediction algorithm selection callback. disables unwanted settings options.
+        """
+        self.method_toggle(new)
+        # append additional parameter inputs in parameters tab
         if new in ('Nupack','Compare_RVN'):
             self.para_settings.children.append(self.nupack_para)
         if old in ('Nupack','Compare_RVN'):
@@ -247,7 +321,7 @@ class structure_prediction():
 
     def tools_cb(self,attr,old,new):
         """
-        reset layout
+        change layout or reset parameters.
         """
         if new=='none':
             return 0
@@ -267,6 +341,11 @@ class structure_prediction():
         self.tools.value='none'
 
     def change_parameter(self,mode):
+        """
+        according to the mode selected,
+        change available parameters input fields in paramters tab.
+        also changes input field text if not previous operations have started.
+        """
         if mode == 'default':
             recommendmethod=self.method.value
             self.para_settings.children = [PreText(text='Default Mode Parameter Settings'),self.default_mode_para]
@@ -307,6 +386,9 @@ class structure_prediction():
         self.method.value=recommendmethod
 
     def _sequence_cleaner(self,seq):
+        """
+        clean up sequence by filter out unallowed characters.
+        """
         seq = seq.strip().split('\n')
         result=[]
         for i in seq:
@@ -316,6 +398,9 @@ class structure_prediction():
         return result
 
     def parsesequence(self,*args):
+        """
+        output sequence reads based on currently selected tool mode.
+        """
         mode =self.tool_mode
         seq = self.sequence.value
         if mode in ['default','plot']:
@@ -340,6 +425,9 @@ class structure_prediction():
             return sl,cl
 
     def parse_conc(self,conc):
+        """
+        convert concentrations string to number in M.
+        """
         amout=float(conc.lower().rstrip('nmupf'))
         unit=conc.lower().lstrip('0123456789.')
         unitdict={'um':1e-6,'m':1,'nm':1e-9,'mm':1e-3,'pm':1e-12,'fm':1e-15}
@@ -347,6 +435,9 @@ class structure_prediction():
 
 
     def parsepara(self):
+        """
+        collect all parameter inputs and return a dict.
+        """
         mode =self.tool_mode
         para={'method':self.method.value}
         if self.method.value in ('Nupack','Compare_RVN'):
@@ -397,12 +488,18 @@ class structure_prediction():
 
 
     def clear_cache(self):
+        """
+        remove cache pictures to less than 10.
+        """
         file_list = sorted(glob.glob(path.join(cache_loc,'*')),key=lambda x: path.getmtime(x))
         if len(file_list)>10:
             os.remove(file_list[0])
         return len(file_list)
 
     def predict_cb(self,):
+        """
+        main entrance for predict button.
+        """
         name=self.name.value
         backend=self.plotbackend
         mode=self.tool_mode
@@ -506,6 +603,9 @@ class structure_prediction():
             self.plot.text=str(e)
 
     def update_cofold(self,sequence,para):
+        """
+        predict button falls to this function call when co-fold mode is active.
+        """
         ms=Multistrand(*sequence)
         ms.fold(**para)
         title=' '.join(['S'+str(i+1)+':'+"{:.1e}".format(j) for i,j in enumerate(sequence[1])])
@@ -520,8 +620,9 @@ class structure_prediction():
         {}
         """.format(title,ms.to_html('complex_df'))
 
-
-helptext="""
+# holds help text for different modes
+helptext=dict(
+default="""
 <h2>Secondary Structure Prediction (This is outdated help.)</h2>
 <h3>- based on <a href='https://rna.urmc.rochester.edu/RNAstructure.html'>RNAstructure package</a> and
     <a href='https://www.tbi.univie.ac.at/RNA/'> ViennaRNA package</a> </h3>
@@ -552,61 +653,23 @@ In subsequent structure prediction, this nucleotide will be in a GU
 pair.</p>
 <p>Click <b>Predict</b> will use current paramters to predict secondary structures.</p>
 <p>Click <b>Reset</b> will reset all parameters.</p>
-"""
-
-
-class Header():
-    def __init__(self):
-        self.template="""
-        <style>
-        h1 {{
-          position: relative;
-          animation: mymove 2s;
-          animation-iteration-count: infinite;
-        }}
-
-        @keyframes mymove {{
-        0%  {{ border:4px outset #81F7F3;  }}
-        20% {{ border:4px outset #81F7F3; }}
-        50% {{ border:4px outset #ff66ff; }}
-        70% {{ border:4px outset #81F7F3; }}
-        100%{{ border:4px outset #81F7F3;}}
-        }}
-        </style>
-        <h1 style="width:1050px;height:50px;border: 4px outset #81F7F3;text-align:center;font-family:cursive;font-size:230%;color:#FF00BF;background-color:{color}"">
-        &#128540
-        <span style="color:#0000FF">F</span>
-        <span style="color:red">O</span>
-        <span style="color:#FFFF00">L</span>
-        <span style="color:#31B404">D</span>
-        <span style="color:#FF00BF">ojo </span>
-        &#129322
-        {subtitle}
-        </h1>
-        """
-
-    @property
-    def default(self):
-        return self.template.format(subtitle='',color='#81F7F3')
-    @property
-    def plot(self):
-        return self.template.format(subtitle='Plot Structure Mode',color='#088A85')
-    @property
-    def exclusion(self):
-        return self.template.format(subtitle='Structure Exclusion Mode',color='#0404B4')
-    @property
-    def single(self):
-        return self.template.format(subtitle='Single Strand Design Mode',color='#2EFE2E')
-    @property
-    def multi(self):
-        # two strand design
-        return self.template.format(subtitle='Multi-Strand Design',color='#100719')
-    @property
-    def cofold(self):
-        return self.template.format(subtitle='Co-Fold of Multiple Sequences',color='#FE9A2E')
-    @property
-    def perturb(self):
-        return self.template.format(subtitle='Structure Perturbation Mode',color='#F5A9D0')
-
-
-header=Header()
+""",
+plot="""
+<h2>Plot Mode</h2>
+""",
+exclusion="""
+<h2>Structure Exclusion Mode</h2>
+""",
+single="""
+<h2>Single Strand Design Mode</h2>
+""",
+multi="""
+<h2>Multi-Strand Design Mode</h2>
+""",
+perturb="""
+<h2>Structure Perturbation Mode</h2>
+""",
+cofold="""
+<h2>Co-Fold Mode</h2>
+""",
+)
