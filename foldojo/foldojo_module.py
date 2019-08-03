@@ -351,7 +351,7 @@ class structure_prediction():
         self.align_options.active=[1]
         self.fold_cluster.value='hamming'
         self.fold_center.value='energy'
-        self.dangels.value='some'
+        self.dangles.value='some'
         self.pseudo.active=[]
         self.energypara.value='1995'
         self.sodium='0.15'
