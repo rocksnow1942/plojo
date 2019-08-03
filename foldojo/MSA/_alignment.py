@@ -184,7 +184,7 @@ class Alignment():
                         counter=c
         return (seq, count, offset), (seq_, count_, offset_)
 
-    def format(self, id=False, count=False, offset=False, collapse=0,order=False,index=False,link=False):
+    def format(self, id=False, reverseindex=False,maxlength=0,count=False, offset=False, collapse=0,order=False,index=False,link=False):
         """
         option to show ID or Count number or Offset
         collapse will collapse sequence with a hamming distance < given number.
@@ -212,12 +212,14 @@ class Alignment():
                 linker=''
                 for i,j in zip(_string1[i],_string1[i+1]):
                     if i==j:
-                        linker+='&nbsp'
+                        linker+='|'
                     else:
                         linker+='*'
                 linkers.append(linker)
             _string1 = [i for p in zip(_string1,linkers) for i in p]+_string1[-1:]
 
+        if reverseindex:
+            _string1=[i[::-1] for i in _string1]
 
         # indexing
         if index:
@@ -230,11 +232,21 @@ class Alignment():
                         index[j]+=str(i//(10**(digits-1-j)))[-1]
                     else:
                         index[j]+='-'
-            return '\n'.join(index+_string1)
-        else:
-            return '\n'.join(_string1)
+            _string1=index+_string1
 
+        if reverseindex:
+            _string1=[i[::-1] for i in _string1]
 
+        if maxlength:
+            chunks = int(len(_string1[0])/maxlength) + 1*bool(len(_string1[0])%maxlength)
+            newstring=[]
+            for i in range(chunks):
+                for j in _string1:
+                    newstring.append(j[i*maxlength:(i+1)*maxlength])
+                newstring.append('='*maxlength)
+            _string1=newstring[0:-1]
+
+        return ('\n').join(_string1)
 
     def __len__(self):
         return len(self.freq)

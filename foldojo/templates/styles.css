@@ -44,11 +44,37 @@ textarea
 	height: 120px;
 }
 
+#test1{
+    wrap:'off';
+    font-size:12px;
+    font-family: monospace;
+    width: 770px;
+    height: 200px;
+}
+
+#texta2{
+    wrap:'off';
+    font-size:12px;
+    font-family: monospace;
+    width: 770px;
+    height: 200px;
+}
+#texta3{
+    wrap:'off';
+    font-size:12px;
+    font-family: monospace;
+    width: 770px;
+    height: 200px;
+}
+
+
 .custom1
 {
     margin: 15px 50px 15px 50px;
 
 }
+
+
 
 .widgetbox
 {
@@ -66,6 +92,7 @@ textarea
     padding: 0px 0px 0px 0px;
     margin: 0px 0px 0px 0px;
 }
+
 
 .divider
 {

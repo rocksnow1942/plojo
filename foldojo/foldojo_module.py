@@ -5,6 +5,8 @@ from bokeh.layouts import widgetbox,column,row,layout
 from _structurepredict import Structure,SingleStructureDesign,StructurePerturbation,MultiStructureDesign,Multistrand
 import datetime
 from MSA import Alignment, buildMSA
+from functools import partial
+
 cache_loc=path.join(path.dirname(__file__),'static','cache')
 
 
@@ -178,13 +180,18 @@ class structure_prediction():
         self.predict = Button(label=chr(9193)+' Predict ',button_type='success',width=buttonwidth,css_classes=['button'])
         self.tools = Dropdown(label=chr(127922)+' Tools ',button_type='success',width=buttonwidth,css_classes=['button'],
         value=None,menu = [('Draw Structure','plot'),None,('Default mode','default'),('Structure Exclusion','exclusion'),('Single Strand Design','single'),
-        ('Multi-Strand Design','multi'),('Structure Perturbation','perturb'),None,('Co-Fold','cofold'),('Reset Parameter','reset')]) #('Co-Fold','cofold'),
+        ('Multi-Strand Design','multi'),('Structure Perturbation','perturb'),None,('Co-Fold','cofold'),]) #('Co-Fold','cofold'),
         self.align = Button(label = chr(128260)+ ' Align',button_type='success',width=buttonwidth,css_classes=['button'])
         self.settings = Dropdown(label=chr(128295)+' Settings', button_type='success',value='.png',css_classes=['button'],
-                                    menu = [('As PNG','.png'),('As SVG','.svg')],width=buttonwidth)
-        self.help = Button(label=chr(10067)+' Help',button_type='success',width=buttonwidth)
+                                    menu = [('Reset Parameter','reset'),None,('As PNG','.png'),('As SVG','.svg')],width=buttonwidth)
+        self.help = Button(label=chr(10067)+' Help',button_type='success',width=buttonwidth,)
 
+        # holder for pasting temporary stuff.
+        self.holder_1=TextAreaInput(title='Holder',rows=7,cols=100,max_length=5000,width=600,id='test1')
+        self.holder_2=TextAreaInput(title='Holder',rows=7,cols=100,max_length=5000,width=600,id='texta2')
+        self.holder_3=TextAreaInput(title='Holder',rows=7,cols=100,max_length=5000,width=600,id='texta3')
 
+        self.holder=column(self.holder_1,self.holder_2,self.holder_3)
 
         # misc
         #
@@ -193,7 +200,7 @@ class structure_prediction():
 
         self.text = Div(text='',width=800,height=900)
         self.plottab = Tabs(active=0,width=810,height=930,tabs=[Panel(child=self.plot,title='Output1'),Panel(child=self.text,title='Output2'),
-                Panel(child=self.para_settings,title="Parameters")])
+                Panel(child=self.para_settings,title="Parameters"),Panel(child=self.holder,title="Holder")],)
         self.div=Div(width=50,css_classes=['divider'])
         self.div1=Div(width=50,css_classes=['divider'])
         self.div2=Div(width=50,css_classes=['divider'])
@@ -202,6 +209,9 @@ class structure_prediction():
 
         # add callbacks
         self.predict.on_click(self.predict_cb)
+        for i in [self.holder_1,self.holder_2,self.holder_3]:
+            cb = partial(self.holder_cb,tool=i)
+            i.on_change('value',cb)
 
         # self.predict.callback=CustomJS(args=dict(plot=self.plot),code="""document.getElementById("Test1234").innerHTML = "whatever" """)
 
@@ -210,6 +220,7 @@ class structure_prediction():
         self.settings.on_change('value',self.settings_cb)
         self.align.on_click(self.align_cb)
         self.help.on_click(self.help_cb)
+        self.sequence.on_change('value',self.sequence_cb)
 
         # layouts
         self.layout=layout([self.header],[self.sequence],[widgetbox(self.name,self.method,*self.parainputs,css_classes=['widgetbox']),
@@ -226,6 +237,40 @@ class structure_prediction():
         self.showingplot=True
         self.plotbackend = '.png'
 
+    def sequence_cb(self,attr,old,new):
+        """
+        call back to update enter sequence input field title to show GC content info.
+        """
+        result=self._sequence_cleaner(new,alphabet='small')
+        if len(result)!=1:
+            self.sequence.title="Enter Sequence: {} entries entered".format(len(result))
+            return 0
+        seq=result[0].upper()
+        length = len(seq)
+        A=seq.count('A')
+        T=seq.count('T')+seq.count('U')
+        G=seq.count('G')
+        C=seq.count('C')
+        GC = round((G+C)/length*100,1)
+        self.sequence.title=f"Enter Sequence: {length} n.t., A:{A}, T/U:{T}, G:{G}, C:{C}, GC:{GC}%"
+
+    def holder_cb(self,attr,old,new,tool=None):
+        """
+        call back to update holder title.
+        """
+        seq=new
+        A=seq.count('A')
+        T=seq.count('T')+seq.count('U')
+        G=seq.count('G')
+        C=seq.count('C')
+        length=A+T+G+C
+        if length==0:
+            tool.title='Not a Sequence.'
+        else:
+            GC = round((G+C)/length*100,1)
+            tool.title=f"Total n.t.: {length}, A:{A}, T/U:{T}, G:{G}, C:{C}, GC:{GC}%"
+
+
     def align_cb(self):
         """
         call back function for align button.
@@ -236,13 +281,15 @@ class structure_prediction():
         mode = self.tool_mode
         if backend=='dot': backend='.png'
         try:
+            assert mode in 'default,exclusion',('Align not supported in {} mode. It is only supported in \
+                            default and structure exclusion mode.'.format(mode))
             self.clear_cache()
             gap=int(self.align_gap.value)
             gapext=int(self.align_gapext.value)
             offset=0 in self.align_options.active
             order=1 in self.align_options.active
             para = dict(gap=gap,gapext=gapext,offset=offset,order=order)
-            sequence=self.parsesequence()
+            sequence=self.parsesequence(alphabet='small')
             if mode == 'default':
                 if set(sequence)==set(self.align.seq) and para==self.align_status:
                     self.align.name = name
@@ -256,40 +303,64 @@ class structure_prediction():
                 save = path.join(cache_loc,savename)
 
                 self.align.dna_logo(save=save,show=False)
-
-                self.plot.text="""
-                <h3>Alignment:</h3>
-                <p style= "font-family:monospace">{}</p>
+                self.text.text="""
+                <h3>Alignment LOGO:</h3>
                 <img src="foldojo/static/cache/{}"  hspace='20' height='200' width='700'>
-                """.format(self.align.format(index=True,link=True).replace('\n','</br>'),savename)
+                """.format(savename)
+
+                self.display_align()
+
             elif mode == 'exclusion':
                 seq1,seq2=sequence
                 ali1 = buildMSA(seq1,name=name,**para)
                 ali2 = buildMSA(seq2,name=name,**para)
                 ali1s,ali2s=ali1.format(),ali2.format()
                 self.sequence.value=ali1s+'\n/\n'+ali2s
-                ali1l,ali2l = list(zip(*ali1s.split('\n'))), list(zip(*ali2s.split('\n')))
-                linker=''
-                for i,j in zip(ali1l,ali2l):
-                    if set(i)==set(j):
-                        linker+='|'
-                    else:
-                        linker+='*'
+                two_align = ali1.align(ali2,name=name,**para)
                 self.plot.text="""
                 <h3>Alignment</h3>
-                <p style= "font-family:monospace">{}<br>{}<br>{}</p>
-                """.format(ali1.format(index=True).replace('\n','</br>'),linker,ali2.format().replace('\n','</br>'))
+                <p style= "font-family:monospace">{}</p>
+                """.format(two_align.format(index=True,maxlength=95,link=True).replace('\n','</br>'))
 
         except Exception as e:
             self.plot.text=str(e)
+
+    def display_align(self):
+        """
+        display align if more than 1 sequence is aligned.
+        if only 1 sequence, also dispaly reverse complement sequence,
+        """
+        align=self.align
+        self.plot.text="""
+        <h3>Input Sequence Alignment:</h3>
+        <p style= "font-family:monospace">{}</p>
+        """.format(align.format(index=True,link=True,maxlength=95).replace('\n','</br>'))
+        if len(align.seq)==1:
+            seq=align.seq[0]
+            rcdict=dict(zip('ATCGU','TAGCA'))
+            if 'U' in seq:
+                rcdict.update(A='U')
+            rc=''.join([rcdict[i] for i in seq])[::-1]
+            rcalign=Alignment(sequence=rc)
+            self.plot.text+="""
+            <h3>Reverse Complement, Same index as original sequence:</h3>
+            <p style= "font-family:monospace">{}</p>
+            """.format(rcalign.format(index=True,reverseindex=True,link=True,maxlength=95).replace('\n','</br>'))
+            self.plot.text+="""
+            <h3>Reverse Complement:</h3>
+            <p style= "font-family:monospace">{}</p>
+            """.format(rcalign.format(index=True,link=True,maxlength=95).replace('\n','</br>'))
 
     def settings_cb(self,attr,old,new):
         """
         settings button callback, offers change plot format and help.
         """
-        if new in ['.png','.svg','dot']:
+        if new in ['.png','.svg']:
             self.plotbackend = new
             return 0
+        elif new == 'reset':
+            self.reset_parameters()
+            self.settings.value=old
 
     def help_cb(self):
         self.plot.text=helptext[self.tool_mode]
@@ -328,8 +399,6 @@ class structure_prediction():
         """
         if new=='none':
             return 0
-        elif new == 'reset':
-            self.reset_parameters()
         else:
             self.header.text=getattr(header,new)
             self.tool_mode=new
@@ -402,32 +471,35 @@ class structure_prediction():
         self.method_cb(1,'old',self.method.value)
         self.method.value=recommendmethod
 
-    def _sequence_cleaner(self,seq):
+    def _sequence_cleaner(self,seq,alphabet='all',**kwargs):
         """
         clean up sequence by filter out unallowed characters.
         """
+
+        alphabets =dict(all="ATGCUWSMKRYBDHVN-(.){}*+",small='ATGCU')
+
         seq = seq.strip().split('\n')
         result=[]
         for i in seq:
-            temp=''.join([j.upper() for j in i if j in "ATGCUWSMKRYBDHVN-(.){}*+" ])
+            temp=''.join([j.upper() for j in i.upper() if j in alphabets[alphabet] ])
             if temp:
                 result.append(temp)
         return result
 
-    def parsesequence(self,*args):
+    def parsesequence(self,**kwargs):
         """
         output sequence reads based on currently selected tool mode.
         """
         mode =self.tool_mode
         seq = self.sequence.value
         if mode in ['default','plot']:
-            return self._sequence_cleaner(seq)
+            return self._sequence_cleaner(seq,**kwargs)
         elif mode == 'exclusion':
             seq1,seq2 = seq.strip().split('/')
-            seq1,seq2=self._sequence_cleaner(seq1),self._sequence_cleaner(seq2)
+            seq1,seq2=self._sequence_cleaner(seq1,**kwargs),self._sequence_cleaner(seq2,**kwargs)
             return seq1,seq2
         elif mode in ['single','perturb','multi']:
-            r = self._sequence_cleaner(seq)
+            r = self._sequence_cleaner(seq,**kwargs)
             assert len(r)==2,('Must enter two row.')
             assert set(r[1])<=set("(.*){}+"),('Wrong structure format.')
             return r
@@ -436,7 +508,7 @@ class structure_prediction():
             cl,sl=[],[]
             for i in r:
                 conc=self.parse_conc(i.split('-')[1])
-                s=self._sequence_cleaner(i.split('-')[0])
+                s=self._sequence_cleaner(i.split('-')[0],**kwargs)
                 cl.append(conc)
                 sl.extend(s)
             return sl,cl
@@ -641,9 +713,10 @@ class structure_prediction():
 helptext=dict(
 default="""
 <h2>Default Mode Help</h2>
-<p><b>Enter Sequence</b> Only enter oligo sequence. Case doesn't matter. Letters other than "ATGCUatgcu" will be automatically filtered out.
-Enter multiple sequences in new line.<br>
-Set basic prediction parameters on left side of the page. Including: Sequence Name, Algorithm, Backbone, Temperature.<br>
+<p><b>Enter Sequence</b> Only enter oligo sequence. Case doesn't matter. Enter multiple sequences in new line. Length of sequence,
+ATGC count and GC content will be updated once sequence entered.</p>
+
+<p>Set basic prediction parameters on left side of the page. Including: Sequence Name, Algorithm, Backbone, Temperature.<br>
 <b>Max % suboptimal</b> is the maximum % difference in free energy in suboptimal structures from the lowest free
 energy structure. The higher the number, more suboptimal structures will be predicted. <br>
 <b>Window</b> is a parameter that specifies how different the suboptimal
@@ -652,11 +725,13 @@ structures should be from each other (larger integers require structures to be m
 <b>Force Single Strand</b> Force one or more nucleotide to be single stranded. format: 1,4,38 <br>
 <b>Force Double Strand</b> Force one or more nucleotide to be double stranded. format: 1,4,38 <br>
 <b>Force Pair</b> Force a pair between two nucleotides. format: 1-39,2-38,3-37 <br>
-<b>Force No Pair</b> Prohibit a pair between two nucleotides. format: save as above.<br>
-Click <b>Predict</b> will use current paramters to predict secondary structures.<br>
-Click <b>Align</b> will align the sequences.<br>
+<b>Force No Pair</b> Prohibit a pair between two nucleotides. format: save as above.<br></p>
+
+<p>Click <b>Predict</b> will use current paramters to predict secondary structures. Letters outside of <b>"ATGCUWSMKRYBDHVN-(.){}*+"</b> will be filtered out.<br>
+Click <b>Align</b> will align the sequences. Letters outside of <b>"ATGCU"</b> will be filtered out.<br>
 Click <b>Tools - Reset</b> will reset all parameters.</p>
-Click <b>Settings</b> will change the figure format: SVG is vector image format, PNG is rasterized image.</p>
+
+<p>Click <b>Settings</b> will change the figure format: SVG is vector image format, PNG is rasterized image.</p>
 <p>If <b>Mutiple Sequences</b> are entered and aligned, then Predict will show structures common to all the sequences.</p>
 <p><b>Parameters Tab settings explained:</b></p>
 <p><b>Align gap penalty, Align GapExt Penalty</b>: penalty for alignment.<br>

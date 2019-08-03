@@ -295,6 +295,9 @@ class Structure:
         dotbracket structure,energy,probability,pairtuple,ensemble defect.
         """
         self.foldpara.update(kwargs)
+        for i in self.align.seq:
+            assert set(i)<=set('ATCGU'), ('Nucleotide code {} is not supported in Nupack Algorithm.'.format(set(i)-set('ATCGU')))
+
         if len(self.align.seq)==1:
             return self._Nupack_fold_(self.align.seq[0],percent,**kwargs)
 
