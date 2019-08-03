@@ -132,7 +132,7 @@ class structure_prediction():
         # perturbation mode parameters
         perturb_mode_explain="""<h2>Structure Perturbation</h2>
         <p>Mutate a number of sites concurrently and promote or inhibit a target structure.</p>
-        <p>Use ViennaRNA Algorithm only.</p>
+        <p>Only support Nupack/ViennaRNA algorithm.</p>
         """
         self.perturb_mode_explain = Div(text=perturb_mode_explain,width=700,height=100)
         self.perturb_range = TextInput(title='Mutation Region:',value='ALL',width=180)
@@ -145,7 +145,7 @@ class structure_prediction():
         # single strand parameters
         sgl_nexplaintext = """<h2>Single Strand Design</h2>
         <p>Enter IUPAC notation sequence and target structure. Then predict.</p>
-        <p>Use ViennaRNA Algorithm is much faster than RNAstructure.</p>
+        <p>Use Nupack/ViennaRNA Algorithm is much faster than RNAstructure.</p>
         <p> <b>*</b> is allowed to match any structure. However, This will drastically slow down prediction.</p>
         <h3>IUPAC notation:</h3>
         <p> W=AT S=CG M=AC K=GT R=AG Y=CT B=CGT D=AGT H=ACT V=ACG N=AGCT</p>
@@ -181,7 +181,8 @@ class structure_prediction():
         ('Multi-Strand Design','multi'),('Structure Perturbation','perturb'),None,('Co-Fold','cofold'),('Reset Parameter','reset')]) #('Co-Fold','cofold'),
         self.align = Button(label = chr(128260)+ ' Align',button_type='success',width=buttonwidth,css_classes=['button'])
         self.settings = Dropdown(label=chr(128295)+' Settings', button_type='success',value='.png',css_classes=['button'],
-                                    menu = [('As PNG','.png'),('As SVG','.svg'),None,('Help','help')],width=buttonwidth)
+                                    menu = [('As PNG','.png'),('As SVG','.svg')],width=buttonwidth)
+        self.help = Button(label=chr(10067)+' Help',button_type='success',width=buttonwidth)
 
 
 
@@ -196,6 +197,7 @@ class structure_prediction():
         self.div=Div(width=50,css_classes=['divider'])
         self.div1=Div(width=50,css_classes=['divider'])
         self.div2=Div(width=50,css_classes=['divider'])
+        self.div3=Div(width=50,css_classes=['divider'])
 
 
         # add callbacks
@@ -207,10 +209,12 @@ class structure_prediction():
         self.method.on_change('value',self.method_cb)
         self.settings.on_change('value',self.settings_cb)
         self.align.on_click(self.align_cb)
+        self.help.on_click(self.help_cb)
 
         # layouts
         self.layout=layout([self.header],[self.sequence],[widgetbox(self.name,self.method,*self.parainputs,css_classes=['widgetbox']),
-                    column(row(self.predict,self.div,self.align,self.div1,self.tools,self.div2,self.settings),self.plottab,css_classes=['plotarea'])],)
+                    column(row(self.predict,self.div,self.align,self.div1,self.tools,self.div2,self.settings,
+                            self.div3,self.help),self.plottab,css_classes=['plotarea'])],)
 
 
         # status attributes
@@ -286,9 +290,9 @@ class structure_prediction():
         if new in ['.png','.svg','dot']:
             self.plotbackend = new
             return 0
-        elif new =='help':
-            self.plot.text=helptext[self.tool_mode]
-        self.settings.value=old
+
+    def help_cb(self):
+        self.plot.text=helptext[self.tool_mode]
 
     def method_toggle(self,method):
         """
@@ -306,7 +310,6 @@ class structure_prediction():
             toggle(0,0,0,0,0,1,1,1,1)
         else:
             toggle(0,0,0,0,0,0,0,0,0)
-
 
     def method_cb(self,attr,old,new):
         """
@@ -326,19 +329,33 @@ class structure_prediction():
         if new=='none':
             return 0
         elif new == 'reset':
-            self.fold_status={}
-            self.name.value='NewSequence'
-            self.plot.text="<h2>Parameters reset.</h2>"
-            self.align_gap.value='4'
-            self.align_gapext.value='2'
-            self.align_options.active=[1]
-            self.fold_cluster.value='hamming'
-            self.fold_center.value='energy'
+            self.reset_parameters()
         else:
             self.header.text=getattr(header,new)
             self.tool_mode=new
             self.change_parameter(new)
         self.tools.value='none'
+
+    def reset_parameters(self):
+        self.plot.text=self.text.text="""
+        <h2>Parameters under the hood reset to default.</h2>
+        <h4>Align Gap Penalty=4,Align GapExt Penalty=2</h4>
+        <h4>Structure Filter Method='hamming', Structure Pick Method='energy'</h4>
+        <h4>Dangle Energy='some', Allow Pseudo Knot=False, RNA parameter=1995, Mg=2mM, Na=150mM</h4>
+        <h4>Folding status wiped off.</h4>
+        <h4>Examples are shown for each mode.</h4>"""
+        self.fold_status={}
+        self.change_parameter(self.tool_mode)
+        self.align_gap.value='4'
+        self.align_gapext.value='2'
+        self.align_options.active=[1]
+        self.fold_cluster.value='hamming'
+        self.fold_center.value='energy'
+        self.dangels.value='some'
+        self.pseudo.active=[]
+        self.energypara.value='1995'
+        self.sodium='0.15'
+        self.magnesium='0.002'
 
     def change_parameter(self,mode):
         """
@@ -623,53 +640,123 @@ class structure_prediction():
 # holds help text for different modes
 helptext=dict(
 default="""
-<h2>Secondary Structure Prediction (This is outdated help.)</h2>
-<h3>- based on <a href='https://rna.urmc.rochester.edu/RNAstructure.html'>RNAstructure package</a> and
-    <a href='https://www.tbi.univie.ac.at/RNA/'> ViennaRNA package</a> </h3>
-<p>Predicts the lowest free energy structure and suboptimal structures.</p>
-<h3>How To Use:</h3>
-<p>1. <b>Enter Sequence</b> Only enter oligo sequence. Case doesn't matter. Letters other than "ATGCUatgcu" will be automatically filtered out.
-That is, f[G]f[U]f{T}ome-t = GUTT</p>
-<p>2. <b>Sequence Name</b> Sequence name is used for plot title and figure file name.</p>
-<p>3. <b>Backbone Type</b> Select RNA or DNA. Thermodynamics paramters will be different for DNA or RNA.</p>
-<p>4. <b>Set Temperature</b> This allows the user to specify folding temperatures other than 37deg C.  </p>
-<p>5. <b>Max % suboptimal</b> is the maximum % difference in free energy in suboptimal structures from the lowest free energy structure. The higher the number, more suboptimal structures will be permitted. </p>
-<p>6. <b>Window</b> is a parameter that specifies how different the suboptimal
-structures should be from each other (0=no restriction and larger
-integers require structures to be more different). </p>
-<p>7. <b>Max Structure NO</b> is the maximum number of suboptimal structures to
-generate.</p>
-<p>8. <b>Force Single Strand</b> Force one or more nucleotide to be single stranded. format: n.t. position index separated by ",". e.g. 1,4,38 </p>
-<p>9. <b>Force Double Strand</b> Force one or more nucleotide to be double stranded. format: same as #8.</p>
-<p>10.<b>Force Pair</b> Force a pair between two nucleotides. format: use "-" to link paired n.t., separate multiple pairs by ",". e.g. 1-39,2-38,3-37 </p>
-<p>11.<b>Force No Pair</b> Prohibit a pair between two nucleotides. format: same as #10.</p>
-<p>12.<b>Modification Site</b> This paramater indicates a nucleotide that is accessible to chemical
-modification. In subsequent structure prediction, this nucleotide will
-be single stranded, at the end of a helix, or in or adjacent to a GU
-pair. format: same as #8</p>
-<p>13.<b>FMN Cleavage</b> Indicate a nucleotide that is accessible to FMN cleavage (a U in GU
-pair) (<a href='https://pubs.acs.org/doi/10.1021/ja962918p'>Reference</a>).
-In subsequent structure prediction, this nucleotide will be in a GU
-pair.</p>
-<p>Click <b>Predict</b> will use current paramters to predict secondary structures.</p>
-<p>Click <b>Reset</b> will reset all parameters.</p>
+<h2>Default Mode Help</h2>
+<p><b>Enter Sequence</b> Only enter oligo sequence. Case doesn't matter. Letters other than "ATGCUatgcu" will be automatically filtered out.
+Enter multiple sequences in new line.<br>
+Set basic prediction parameters on left side of the page. Including: Sequence Name, Algorithm, Backbone, Temperature.<br>
+<b>Max % suboptimal</b> is the maximum % difference in free energy in suboptimal structures from the lowest free
+energy structure. The higher the number, more suboptimal structures will be predicted. <br>
+<b>Window</b> is a parameter that specifies how different the suboptimal
+structures should be from each other (larger integers require structures to be more different). <br>
+<b>Max Structure NO</b> is the maximum number of suboptimal structures to generate.<br>
+<b>Force Single Strand</b> Force one or more nucleotide to be single stranded. format: 1,4,38 <br>
+<b>Force Double Strand</b> Force one or more nucleotide to be double stranded. format: 1,4,38 <br>
+<b>Force Pair</b> Force a pair between two nucleotides. format: 1-39,2-38,3-37 <br>
+<b>Force No Pair</b> Prohibit a pair between two nucleotides. format: save as above.<br>
+Click <b>Predict</b> will use current paramters to predict secondary structures.<br>
+Click <b>Align</b> will align the sequences.<br>
+Click <b>Tools - Reset</b> will reset all parameters.</p>
+Click <b>Settings</b> will change the figure format: SVG is vector image format, PNG is rasterized image.</p>
+<p>If <b>Mutiple Sequences</b> are entered and aligned, then Predict will show structures common to all the sequences.</p>
+<p><b>Parameters Tab settings explained:</b></p>
+<p><b>Align gap penalty, Align GapExt Penalty</b>: penalty for alignment.<br>
+<b>Structure Filter Method, Structure Pick Method:</b>The method used to filter out similar structures. This setting
+combined with "Window" determine how different predicted structures are. Structure Pick method is within similar structures,
+which structure is used to represent the common structure.</p>
+<p>If using Nupack algorithm, additional settings show up.<br> <b>RNA parameters</b>: choose parameters from a certain literature
+to use for prediction.<br><b>Dangle Energy</b>: Check nupack.org for details about dangle energy treatment.<br>
+<b>Allow Pseudo Knot:</b> Check this will allow pseudo knot structures be predicted.<br>
+<b>Sodium Concentration (M)/Magnesium Concentration (M):</b> Ion concentrations entered will only affect DNA prediction. Unit in Molar.</p>
+<p><b>Caution:</b> Any values changed here will also affect Nupack predictions in other modes. Also, the Align and Structure filter
+parameters is also applied to other modes.</p>
 """,
 plot="""
-<h2>Plot Mode</h2>
+<h2>Plot Mode Help</h2>
+<p>Enter <b>Sequence and Dotbracket structure</b> in the input box and click <b>Predict</b> to plot the structure you entered.</p>
+<p>If a real sequence is entered, the predicted folding energy and ensemble defect of that structure
+is also calculated in the result.</p>
+<p>If no proper sequence is entered, the ploted dG is taken from parameters tab, [Enter Energy Value] box.</p>
 """,
 exclusion="""
-<h2>Structure Exclusion Mode</h2>
+<h2>Structure Exclusion Mode Help</h2>
+<p>If we know a sequence works and another mutation of it didn't, we can exclude structures that is available to the mutant
+and the structures unique to the positive sequence are more likely to be correct.</p>
+<p>The sequences above <b>"/"</b> will be considerred positive sequences, the sequences below will be considerred negative.</p>
+<p>Click <b>Predict</b> will return the unique structures to positive sequences, and reject structures of negative sequences.</p>
+<p><b>Parameters Tab settings explained:</b></p>
+<p><b>Exclude structure threshold:</b> fold difference threshold for a structure to be excluded. default is 10. Normally,
+if a structure only presented in positive sequence, it will be retained in the result. However, if a structure
+showed up in both positive and negative sequence structure ensemble, it doesn't necessarily mean this structure isn't
+valid. Its ratio difference in positive and negative sequence ensemble is considerred in this case. If Structure
+X consist 10% of positive sequence structure ensemble, and negative sequence structure ensemble have 2% of it.
+Because 10%/2% = 5 < 10, structure X will be excluded. However, if X only consist 1%, structure X will be retained.</p>
+<p><b>Structure Match Method , Structure Match Threshold</b>: determines how we call two structures identical. Can choose
+exact match or other distance measurements. Structures with distance below certain threshold will be considered equal, and
+will be subjected to exclusion removal comparison.</p>
 """,
 single="""
-<h2>Single Strand Design Mode</h2>
+<h2>Single Strand Design Mode Help</h2>
+<p>Enter <b>IPUAC notation denoted sequence</b> in the first line, the degenerate sequence is used as template for sequence generation.
+In a second line, enter <b>dotbracket structure</b> you want to design.</p>
+<p>By design, "*" can be used in dotbracket structure to match paired or unpaired sites. However, use it with caution.
+Because this will casue foldojo slow down exponetially when more iterations are tried.</p>
+<p>Click <b>Predict</b>, different sequences that match the degenerate sequence will be predict and ordered according to
+their deltaG, ratio and Ensemble Defect in the "Output2" tab. the most favorable sequence and its secondary structure will
+ be predicted and showed in "Output1" tab.</p>
+<p><b>Which Algorithm To Use?</b> Use ViennaRNA or Nupack is preferred due to their speed. RNAstructure is much slower.
+However, sequences from Nupack will not always follow the degenerate sequence you provided. (Nupack use the provided
+sequence as a "seed" instead of using it as a boundary.)</p>
+<p><b>Parameters Tab settings explained:</b></p>
+<p><b>Maximum Iterations</b>: how many total random different sequences to test. This will only affect
+RNAstructure or ViennaRNA algorithm.</p>
+<p><b>Show Top</b>: how many result sequences will be reported. If using Nupack algorithm, only half
+the amount entered in "Show Top" will be reported. This is due to different ways foldojo interact with different algorithms.</p>
+<p><b>Structure Match Method, Structure Match Threshold</b> When using RNAstructure algorithm, the method and threshold
+selected here will be used to match the predicted structure of a random sequence to the desired structure. If using ViennaRNA
+ algorithm and "*" is used in structure, method is default to "Star Match".</p>
 """,
 multi="""
-<h2>Multi-Strand Design Mode</h2>
+<h2>Multi-Strand Design Mode Help</h2>
+<p>This mode is used to design <b>multiple strands that can hybridize into a given structure</b>. Only <b>Nupack</b> algorithm
+is supported in this mode.</p>
+<p>Enter <b>IPUAC notation denoted sequence</b> in the first line, the degenerate sequence is used as template for sequence generation.
+In a second line, enter <b>dotbracket structure</b> you want to design. Separate sequences and structures
+in different strands by "+".</p>
+<p>Click <b>Predict</b>, different sequences that match the degenerate sequence will be predict and ordered according to
+their deltaG, ratio and Ensemble Defect in the "Output2" tab. the most favorable sequence and its secondary structure will
+ be predicted and showed in "Output1" tab. The black "+" in secondary structure plot indicate a strand break.</p>
+<p><b>Parameters Tab settings explained:</b></p>
+<p><b>Show Top</b>/2 is the number of sequences that will be generated.</p>
+<p>Refer to help in <b>Default mode</b> for explanation of other parameters for Nupack algorithm.</p>
 """,
 perturb="""
 <h2>Structure Perturbation Mode</h2>
+<p>This mode is used to try and test mutate all possible sites in a sequence, to identify mutattions that
+either <b>promote</b> or <b>inhibit</b> the ratio of a given structure in predicted ensemble. </p>
+<p>Only <b>ViennaRNA</b> and <b>Nupack</b> algorithm is supported in this mode.</p>
+<p>Enter Sequence in first line followed by Structre in dotbracket format in second line.</p>
+<p>In <b>Parameters</b> tab, choose options.</p>
+<p><b>Perturbation Goal</b>: can be inhibit or promote.</p>
+<p><b>Mutation Region</b>: select the nucleotide region you want to target the mutation. Limit region can reduce
+the search space and make search more thorough. format is 1-5,8-10 : this means n.t. 1 to 5 and 8 to 10 are allowed
+mutations sites.</p>
+<p><b>Total mutation sites</b>: maximum number of mutations allowed.</p>
+<p><b>Maximum Iterations</b>: maximum number of random sequences to try. If total possible permutation is less
+than twice the number here, foldojo will try all possible sequences. Otherwise, sequences are randomly generated until
+reach the max limit.</p>
+<p>Click <b>Predict</b>, different sequences ranked according to the perturbation goal are listed in the "Output2" tab.
+The most favorable sequence and its secondary structure will
+ be predicted and showed in "Output1" tab.</p>
 """,
 cofold="""
 <h2>Co-Fold Mode</h2>
+<p>This mode is used to predict oligo complex concentrations in the equilibrium solution. Only <b>Nupack</b> algorithm is supported
+in this mode.</p>
+<p>Enter oligo strands in separate lines, each sequence is followed by "-concentration". Molar concentration should be used (pM/nM/uM etc.).</p>
+<p>In <b>Parameters</b> tab, enter Max Complex Strands: the maximum number of oligo strands allowed to form in one single complex.</p>
+<p>Refer to help in <b>Default mode</b> for explanation of other parameters for Nupack algorithm.</p>
+<p>Click <b>Predict</b>, In Output1 tab, the complex species, their ensemble deltaG and their equilibrium concentration
+are listed, ranked by their concentrations. In Output2 tab, the Minimum Free Energy structure of each complex species
+are denoted in dotbracket format. Their MFE is also shown.</p>
 """,
 )

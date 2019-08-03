@@ -53,8 +53,9 @@ class Structure:
         """
         sequence is stored in Alignment class.
         """
-        self.align=align if isinstance(align,Alignment) else Alignment(align,name=name)
-        self.name=name or self.align.name
+        if align:
+            self.align=align if isinstance(align,Alignment) else Alignment(align,name=name)
+            self.name=name or self.align.name
         self.foldpara={}
         if save_loc:self.save_loc=save_loc
 
@@ -200,7 +201,7 @@ class Structure:
         for d,r in zip(self._dot,self._ratio):
             for d2,r2 in zip(b._dot,b._ratio):
                 if judge(d,d2):
-                    if r<=r2*threshold:
+                    if r<r2*threshold:
                         print('removed:{}, r1:{} r2:{}'.format(d,r,r2))
                         toremove.append(d)
         self.remove(toremove)
@@ -374,7 +375,7 @@ class Structure:
         length=len(sequence)
         percent *=0.5**(max(length-60,0)/10)
         percent = min(50,percent) # reduce percentage every 15 nt longer
-        self.foldpara['percent']=round(percent,1)
+        self.foldpara.update(percent=round(percent,1))
         single=kwargs.get('ForceSingleStranded',None)
         double=kwargs.get('ForceDoubleStranded',None)
         pair=kwargs.get('ForcePair',None)
@@ -799,7 +800,7 @@ class SingleStructureDesign(MutableSequence):
             judge = Structure_eq('starmatch')
         else:
             judge = Structure_eq(kwargs.get('strexc_method','match'),kwargs.get('strexc_threshold',None))
-        foldmethod = Structure._RNAstructure_fold_ if _rnastru else Structure._ViennaRNA_fold_
+        foldmethod = Structure()._RNAstructure_fold_ if _rnastru else Structure()._ViennaRNA_fold_
         result=Design_collector(top,lambda x:(-x[3],-x[4],x[1]))
         temp=SetTemperature#self.foldpara.get('SetTemperature',37)
         t=temp+273.15
@@ -817,7 +818,8 @@ class SingleStructureDesign(MutableSequence):
         """
         multiprocessing task.
         """
-        s,e,*_,ed = foldmethod(1,sequence=seq,percent=percent,SetTemperature=temp)
+
+        s,e,*_,ed = foldmethod(sequence=seq,percent=percent,SetTemperature=temp)
         e=np.array(e)
         totalR = (kT**(e)).sum()
         mfe=np.min(e)
@@ -846,7 +848,6 @@ class StructurePerturbation(SingleStructureDesign):
         self.target=target
         self.n=n
         assert len(seed)==len(target), ('Sequence and Structure must be of same length.')
-        assert n<=len(target), ('permutation sites must less than sequence length.')
         totmut = list(range(len(seed)))
         if mutrange is None:
             self.mutable = totmut
@@ -857,10 +858,11 @@ class StructurePerturbation(SingleStructureDesign):
                     if k>j: k,j=j,k
                     if k<=i<=j:
                         self.mutable.append(i)
+        assert n<=len(self.mutable), ('Total mutation sites must less than allowed mutable region.')
 
     @lazyproperty
     def totalmutation(self):
-        n = len(self.seq)
+        n = len(self.mutable)
         m=self.n
         c = 4**self.n
         p = np.prod(range(n-m+1,n+1))/np.prod(range(1,m+1))
