@@ -37,7 +37,6 @@ p {
 
 textarea
 {
-    wrap:'off';
     font-size:14px;
     font-family: monospace;
     width: 1033px;
@@ -45,7 +44,6 @@ textarea
 }
 
 #test1{
-    wrap:'off';
     font-size:12px;
     font-family: monospace;
     width: 770px;
@@ -53,14 +51,12 @@ textarea
 }
 
 #texta2{
-    wrap:'off';
     font-size:12px;
     font-family: monospace;
     width: 770px;
     height: 200px;
 }
 #texta3{
-    wrap:'off';
     font-size:12px;
     font-family: monospace;
     width: 770px;
