@@ -5,3 +5,5 @@ predictlayout=structure_prediction().layout
 
 curdoc().add_root(predictlayout)
 curdoc().title = chr(128540) + 'Foldojo'
+
+# test tag
