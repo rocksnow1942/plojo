@@ -236,6 +236,7 @@ class structure_prediction():
         self.align=Alignment()
         self.showingplot=True
         self.plotbackend = '.png'
+        self.structure = None
 
     def sequence_cb(self,attr,old,new):
         """
