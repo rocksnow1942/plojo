@@ -424,8 +424,8 @@ class structure_prediction():
         self.dangles.value='some'
         self.pseudo.active=[]
         self.energypara.value='1995'
-        self.sodium='0.15'
-        self.magnesium='0.002'
+        self.sodium.value='0.15'
+        self.magnesium.value='0.002'
 
     def change_parameter(self,mode):
         """
