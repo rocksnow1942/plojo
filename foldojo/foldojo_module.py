@@ -576,7 +576,6 @@ class structure_prediction():
 
         return para
 
-
     def clear_cache(self):
         """
         remove cache pictures to less than 10.

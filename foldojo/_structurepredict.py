@@ -56,6 +56,8 @@ class Structure:
         if align:
             self.align=align if isinstance(align,Alignment) else Alignment(align,name=name)
             self.name=name or self.align.name
+        if name:
+            self.name=name or self.align.name
         self.foldpara={}
         if save_loc:self.save_loc=save_loc
 
