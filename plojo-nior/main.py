@@ -133,9 +133,11 @@ def generate_cds(run_index,**kwargs):
     align_mode = kwargs.get('align_mode',False)
     offset_curve,offset = kwargs.get('offset',('A',0))
     index = run_index.split('-')[0]
-    run_speed = raw_data.experiment[index][run_index].get('speed',0)
-    run = raw_data.experiment[index][run_index]
-    run_raw = raw_data.experiment_raw[index][run_index]
+    run_speed = raw_data.experiment[index].get(run_index,{}).get('speed',0)
+    run = raw_data.experiment[index].get(run_index,{})
+    run_raw = raw_data.experiment_raw[index].get(run_index,{})
+    if not run_raw:
+        info_box.text = info_deque('{} broken, delete and reupload.'.format(run_index))
     curve_type_options=[primary_axis,secondary_axis]
     run_dict = dict.fromkeys(curve_type_options)
     integration_dict = dict.fromkeys(curve_type_options)
@@ -414,7 +416,8 @@ def check_run_analysis(run_index):
 
 def check_selected_runs():
     """
-    check the analysis of selected runs.
+    check the analysis of selected runs. currently only repairing integration error.
+    Todo: add repair for missing index data.
     """
     entry = sd_run_list.value
     if mode_selection.active != 1:

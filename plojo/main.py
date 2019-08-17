@@ -990,6 +990,7 @@ def refine_select_menu():
     else:
         info_box.text = info_deque('Empty search scope.')
 
+
 def cf_focused_select_data_cb(attr, old, new):
     selected_items = cf_focused_select_data.value
     if len(selected_items) == 1:
