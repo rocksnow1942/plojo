@@ -11,7 +11,6 @@ from simu_utils import file_save_location,file_name
 import datetime
 
 
-
 cache_loc=path.join(path.dirname(__file__),'static','cache')
 
 
