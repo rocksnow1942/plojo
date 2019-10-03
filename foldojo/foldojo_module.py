@@ -78,13 +78,13 @@ class structure_prediction():
     """
     def __init__(self):
         #parameters default
-        width=125
-        buttonwidth=100
+        width=150
+        buttonwidth=150
 
         # define gadgets
         #inputs
         self.sequence =TextAreaInput(title="Enter Sequence:",value='ACCCTTGCTTGCGTAGCATTTTACCAGTGAGTCGGATCTCCGCATATCTGCG',
-                            rows=7,cols=150,max_length=5000,width=1000,css_classes=['custom1'])
+                            rows=7,cols=150,max_length=5000,width=1055,css_classes=['custom1'])
         self.name=TextInput(title='Sequence Name',value='NewSequence',width=width)
         self.inputa_backbone =Select(title='Backbone type:',value='rna',options=[('rna','RNA'),('dna','DNA')],width=width)
         self.inputb_SetTemperature = TextInput(title='Set Temperature (C):',value='37',width=width)
@@ -187,25 +187,21 @@ class structure_prediction():
         self.help = Button(label=chr(10067)+' Help',button_type='success',width=buttonwidth,)
 
         # holder for pasting temporary stuff.
-        self.holder_1=TextAreaInput(title='Holder',rows=7,cols=100,max_length=5000,width=600,id='test1')
-        self.holder_2=TextAreaInput(title='Holder',rows=7,cols=100,max_length=5000,width=600,id='texta2')
-        self.holder_3=TextAreaInput(title='Holder',rows=7,cols=100,max_length=5000,width=600,id='texta3')
+        self.holder_1=TextAreaInput(title='Holder',rows=7,cols=100,max_length=5000,width=600,id='test1',css_classes=['custom1'])
+        self.holder_2=TextAreaInput(title='Holder',rows=7,cols=100,max_length=5000,width=600,id='texta2',css_classes=['custom1'])
+        self.holder_3=TextAreaInput(title='Holder',rows=7,cols=100,max_length=5000,width=600,id='texta3',css_classes=['custom1'])
 
         self.holder=column(self.holder_1,self.holder_2,self.holder_3)
 
         # misc
         #
-        self.header= Div(text=header.default,width=1000,height=40,css_classes=['custom1'])
+        self.header= Div(text=header.default,width=1000,height=75,css_classes=['custom1'])
         self.plot = Div(text="<h2>Welcome!<br><br>Today is {}.</h2>".format(datetime.datetime.now().strftime("%A, %B %-d")),width=800,height=900,)
 
         self.text = Div(text='',width=800,height=900)
         self.plottab = Tabs(active=0,width=810,height=930,tabs=[Panel(child=self.plot,title='Output1'),Panel(child=self.text,title='Output2'),
                 Panel(child=self.para_settings,title="Parameters"),Panel(child=self.holder,title="Holder")],)
-        self.div=Div(width=50,css_classes=['divider'])
-        self.div1=Div(width=50,css_classes=['divider'])
-        self.div2=Div(width=50,css_classes=['divider'])
-        self.div3=Div(width=50,css_classes=['divider'])
-
+        self.div=Div(width=5,)
 
         # add callbacks
         self.predict.on_click(self.predict_cb)
@@ -223,9 +219,9 @@ class structure_prediction():
         self.sequence.on_change('value',self.sequence_cb)
 
         # layouts
-        self.layout=layout([self.header],[self.sequence],[widgetbox(self.name,self.method,*self.parainputs,css_classes=['widgetbox']),
-                    column(row(self.predict,self.div,self.align,self.div1,self.tools,self.div2,self.settings,
-                            self.div3,self.help),self.plottab,css_classes=['plotarea'])],)
+        self.layout=layout([self.header],[self.sequence],[widgetbox(self.name,self.method,*self.parainputs,css_classes=['widgetbox']),self.div,
+                    column(row(self.predict,self.align,self.tools,self.settings,
+                            self.help),self.plottab,css_classes=['plotarea'])],)
 
 
         # status attributes

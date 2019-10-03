@@ -1,0 +1,46 @@
+#!/bin/bash
+plojo_folder="/Users/hui/Documents/Scripts/plojo_app"
+plojo="${plojo_folder}/plojo"
+plojonior="${plojo_folder}/plojo-nior"
+simuojo="${plojo_folder}/simuojo"
+foldojo="${plojo_folder}/foldojo"
+plojohelp="${plojo_folder}/plojo_help"
+menu="$plojo $plojonior $simuojo $foldojo $plojohelp"
+menuarr=($menu)
+
+echo $plojo
+
+
+echo ""
+echo "***************************"
+echo "*    Start Plojo Server   *"
+echo "***************************"
+option=100
+
+while true;
+do
+echo""
+echo "Choose option:"
+echo "1. plojo"
+echo "2. plojo-nior"
+echo "3. simuojo"
+echo "4. foldojo"
+echo "5. plojo help"
+echo "0. exit"
+
+read option
+if [ $option = 0 ]
+then
+break
+elif (( $option > 5 ))
+then
+echo "Your selection $option is not at service."
+continue
+fi
+echo "Your option is $option : ${menuarr[$option-1]} "
+echo "${menuarr[$option-1]}"
+bokeh serve "${menuarr[$option-1]}" --show
+
+done
+
+echo "Byebye!"
