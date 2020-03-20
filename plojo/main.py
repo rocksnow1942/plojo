@@ -1399,7 +1399,7 @@ edit_dropdown.on_change('value',edit_dropdown_cb)
 
 # layouts
 save_layout = layout([button_mode, info_box,edit_dropdown,plot_dropdown, button_load, button_save], [sd_row_1], [
-                     sd_data,column(project_list,project_name,project_dropdown)], [sd_data_table, column(sd_type_check, sd_upload_opt,sd_save_data)], [ams_logo,botton_spacer])
+                     sd_data,column(project_list,project_name,project_dropdown)], [sd_data_table, column(sd_type_check, sd_upload_opt,sd_save_data)], [ams_logo,botton_spacer], sizing_mode)
 
 read_layout = layout([button_mode, info_box,edit_dropdown,plot_dropdown, button_load, button_save], [read_layout_plots,column(data_outlier_tab, row(options, vd_data_info))], [ams_logo,botton_spacer],)
 
